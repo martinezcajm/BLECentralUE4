@@ -77,11 +77,15 @@ public:
   virtual void BeginDestroy() override;
 	
 private:
+
   UPROPERTY()
     FString path;
 
   UPROPERTY()
-    FString friendlyName;
+    FString friendlyName_;
+
+  UPROPERTY()
+    bool ready_;
 
   //Handle to use the device
   HANDLE deviceHandle;
@@ -92,5 +96,10 @@ private:
   //Characteristics of the device
   PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
 	
-	
+  void TestGetGattServices();
+
+  void TestGetCharacteristics();
+
+  void TestGetDescriptors();
+
 };

@@ -56,7 +56,18 @@
 
 #include "BLECentral.generated.h"
 
+UENUM(BlueprintType)
+enum class EDeviceProperty : uint8 {
+  PE_FriendlyName = SPDRP_FRIENDLYNAME UMETA(DisplayName = "Name"),
+  PE_ClassGuid = SPDRP_CLASSGUID UMETA(DisplayName = "ClassGuid"),
+  PE_TypeDevice = SPDRP_DEVTYPE UMETA(DisplayName = "DeviceType")
+};
 
+UENUM(BlueprintType)
+enum class EDeviceInterfaceDetail : uint8 {
+  IE_Path UMETA(DisplayName = "Path"),
+  IE_Size  UMETA(DisplayName = "ClassGuid")
+};
 
 /**
  * 
@@ -70,7 +81,11 @@ public:
   UFUNCTION()
     TArray<UBLEDevice*> SearchBLEDevices();
 	
+private:
 
-	
+    FString GetDeviceProperty(EDeviceProperty devProperty, HDEVINFO deviceInfo, SP_DEVINFO_DATA deviceInfoData);
+
+    FString GetDeviceInterfaceDetail(EDeviceInterfaceDetail devIntData, HDEVINFO deviceInfo,
+      SP_DEVINFO_DATA deviceInfoData, SP_DEVICE_INTERFACE_DATA deviceInterfaceData);
 	
 };
