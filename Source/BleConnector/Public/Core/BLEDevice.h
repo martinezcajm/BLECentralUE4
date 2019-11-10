@@ -72,6 +72,9 @@ public:
     void FriendlyName(FString fn);
 
   UFUNCTION()
+    void Path(FString p);
+
+  UFUNCTION()
     void CreateHandle();
 
   virtual void BeginDestroy() override;
@@ -79,7 +82,7 @@ public:
 private:
 
   UPROPERTY()
-    FString path;
+    FString path_;
 
   UPROPERTY()
     FString friendlyName_;
@@ -96,6 +99,7 @@ private:
   //Characteristics of the device
   PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
 	
+public:
   void TestGetGattServices();
 
   void TestGetCharacteristics();

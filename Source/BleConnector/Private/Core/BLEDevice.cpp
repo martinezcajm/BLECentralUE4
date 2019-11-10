@@ -1,19 +1,24 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "BLEDevice.h"
+#include "Engine/Engine.h"
 
 UBLEDevice::UBLEDevice() : UObject() {
   deviceHandle = nullptr;
   pServiceBuffer = nullptr;
   pCharacteristicsBuffer = nullptr;
   ready_ = false;
-  path = "";
+  path_ = "";
   friendlyName_ = "";
 }
 
-UBLEDevice::UBLEDevice(FString p) {
-  path = p;
+UBLEDevice::UBLEDevice(FString p) : UObject() {
+  path_ = p;
   friendlyName_ = "";
+}
+
+void UBLEDevice::Path(FString p) {
+  path_ = p;
 }
 
 void UBLEDevice::FriendlyName(FString fn) {
@@ -21,9 +26,9 @@ void UBLEDevice::FriendlyName(FString fn) {
 }
 
 void UBLEDevice::CreateHandle() {
-  if (path != "") {
+  if (path_ != "") {
     if (deviceHandle != nullptr) CloseHandle(deviceHandle);
-    deviceHandle = CreateFile(*path, GENERIC_WRITE | GENERIC_READ, NULL, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    deviceHandle = CreateFile(*path_, GENERIC_WRITE | GENERIC_READ, NULL, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (deviceHandle == INVALID_HANDLE_VALUE) {
       //TODO error controlling
       return;
@@ -63,7 +68,8 @@ void UBLEDevice::TestGetCharacteristics() {
   //Made a global as we need it to get the characteristics
   //PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
   if (charBufferSize > 0) {
-    std::cout << "The device has  " << charBufferSize << " Characteristics." << std::endl;
+    GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("The device has %i Characteristics"), charBufferSize));
+    //std::cout << "The device has  " << charBufferSize << " Characteristics." << std::endl;
     pCharacteristicsBuffer = (PBTH_LE_GATT_CHARACTERISTIC)malloc(sizeof(BTH_LE_GATT_CHARACTERISTIC)*charBufferSize);
   }
   if (nullptr == pCharacteristicsBuffer) {
@@ -118,8 +124,8 @@ void UBLEDevice::TestGetGattServices() {
   if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != result) {
     //Error
   }
-
-  std::cout << "The device has  " << serviceBufferCount << " Services." << std::endl;
+  GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("The device has %i Services"), serviceBufferCount));
+  //std::cout << "The device has  " << serviceBufferCount << " Services." << std::endl;
   //Made a global as we need it to get the characteristics
   //PBTH_LE_GATT_SERVICE pServiceBuffer;
   pServiceBuffer = (PBTH_LE_GATT_SERVICE)malloc(sizeof(BTH_LE_GATT_SERVICE) * serviceBufferCount);

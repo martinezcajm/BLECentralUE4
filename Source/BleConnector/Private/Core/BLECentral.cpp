@@ -41,68 +41,16 @@ TArray<UBLEDevice*> UBLECentral::SearchBLEDevices() {
     )) {
       interfaceIndex++;
 
-      //DWORD interfaceDataSize = 0;
-      ////Special call to get the size of the data
-      //SetupDiGetDeviceInterfaceDetail(
-      //  hDeviceInfo,
-      //  &deviceInterfaceData,
-      //  NULL,
-      //  NULL,
-      //  &interfaceDataSize,
-      //  NULL);
-
-      //PSP_DEVICE_INTERFACE_DETAIL_DATA pDevIntDetData = (PSP_DEVICE_INTERFACE_DETAIL_DATA)malloc(
-      //  sizeof(PSP_DEVICE_INTERFACE_DETAIL_DATA) + interfaceDataSize
-      //);
-
-      //memset(pDevIntDetData, 0, sizeof(PSP_DEVICE_INTERFACE_DETAIL_DATA) + interfaceDataSize);
-      //pDevIntDetData->cbSize = sizeof(PSP_DEVICE_INTERFACE_DETAIL_DATA);
-      //SetupDiGetDeviceInterfaceDetail(
-      //  hDeviceInfo,
-      //  &deviceInterfaceData,
-      //  pDevIntDetData,
-      //  interfaceDataSize,
-      //  &interfaceDataSize,
-      //  &deviceInfoData
-      //);
-      //FString path = pDevIntDetData->DevicePath;
       FString path = GetDeviceInterfaceDetail(EDeviceInterfaceDetail::IE_Path, hDeviceInfo,
         deviceInfoData, deviceInterfaceData);
-      UBLEDevice newDevice(path);
       
+      UBLEDevice* newDevice = NewObject<UBLEDevice>();
 
-      //free(pDevIntDetData);
-
-      /*DWORD nameData;
-      LPSTR nameBuffer = NULL;
-      DWORD nameBufferSize = 0;
-
-      SetupDiGetDeviceRegistryProperty(
-        hDeviceInfo,
-        &deviceInfoData,
-        SPDRP_FRIENDLYNAME,
-        NULL,
-        NULL,
-        0,
-        &nameBufferSize
-      );
-
-      nameBuffer = (LPSTR)new TCHAR[nameBufferSize * 2];
-
-      SetupDiGetDeviceRegistryProperty(
-        hDeviceInfo,
-        &deviceInfoData,
-        SPDRP_FRIENDLYNAME,
-        &nameData,
-        (PBYTE)nameBuffer,
-        nameBufferSize,
-        &nameBufferSize
-      );
-      FString friendlyName = nameBuffer; */
       FString friendlyName = GetDeviceProperty(EDeviceProperty::PE_FriendlyName, hDeviceInfo, deviceInfoData);
-      newDevice.FriendlyName(friendlyName);
+      newDevice->FriendlyName(friendlyName);
+      newDevice->Path(path);
 
-      devices.Add(&newDevice);
+      devices.Add(newDevice);
     }
   }
 
@@ -127,18 +75,24 @@ FString UBLECentral::GetDeviceProperty(EDeviceProperty devProperty, HDEVINFO dev
     &nameBufferSize
   );
 
-  nameBuffer = (LPSTR)new TCHAR[nameBufferSize * 2];
+  //We use the TArray from UE4 instead of allocating the memory ourselfs.
+  //The TCHAT is to make sure that we are not affected by the encoding of characters
+  //In this case is a wide_char
+  TArray<TCHAR> value;
+  //Wide chars use 2 bytes for one char so we only need half of the required size
+  value.AddUninitialized(nameBufferSize * 0.5);
 
   SetupDiGetDeviceRegistryProperty(
     deviceInfo,
     &deviceInfoData,
     (DWORD)devProperty,
     &nameData,
-    (PBYTE)nameBuffer,
+    (PBYTE)value.GetData(),
     nameBufferSize,
     &nameBufferSize
   );
-  FString result = nameBuffer;
+
+  FString result = value.GetData();
   return result;
 }
 
