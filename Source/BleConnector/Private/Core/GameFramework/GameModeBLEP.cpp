@@ -11,14 +11,16 @@ void AGameModeBLEP::BeginPlay() {
 
   CurrentLowEnergyCentral = NewObject<UBLECentral>();
   TArray<UBLEDevice*> devices =  CurrentLowEnergyCentral->SearchBLEDevices();
-  devices[1]->CreateHandle();
+  //devices[0]->CreateHandle();
   //The order matters!
-  devices[1]->TestGetGattServices();
+  /*devices[1]->TestGetGattServices();
   devices[1]->TestGetCharacteristics();
-  devices[1]->TestGetDescriptors();
+  devices[1]->TestGetDescriptors();*/
+  //bool status = devices[0]->IsConnected();
+  //if (status) {
+  //  devices[0]->GetGattServices();
+  //  devices[0]->GetGATTCharacteristics();
+  //  devices[0]->TestGetDescriptors();
+  //}
   
-  /*if (LowEnergyCentral != nullptr) {
-    CurrentLowEnergyCentral = LowEnergyCentral->GetDefaultObject<UBLECentral>();
-    CurrentLowEnergyCentral->SearchBLEDevices();
-  }*/
 }

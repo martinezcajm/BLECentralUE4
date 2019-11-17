@@ -1,20 +1,51 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "BLEDevice.h"
+#include "GATTCharacteristic.h"
+#include "GATTService.h"
 #include "Engine/Engine.h"
 
 UBLEDevice::UBLEDevice() : UObject() {
   deviceHandle = nullptr;
-  pServiceBuffer = nullptr;
-  pCharacteristicsBuffer = nullptr;
+  //pServiceBuffer = nullptr;
+  //pCharacteristicsBuffer = nullptr;
   ready_ = false;
   path_ = "";
   friendlyName_ = "";
 }
 
-UBLEDevice::UBLEDevice(FString p) : UObject() {
-  path_ = p;
-  friendlyName_ = "";
+void UBLEDevice::Init(HDEVINFO info, SP_DEVINFO_DATA infoData, SP_DEVICE_INTERFACE_DATA interfaceData) {
+  deviceInfo = info;
+  deviceInfoData = infoData;
+  deviceInterfaceData = interfaceData;
+
+  path_ = GetDeviceInterfaceDetail(EDeviceInterfaceDetail::IE_Path);
+
+  friendlyName_ = GetDeviceRegistryProperty(EDeviceRegistryProperty::PE_FriendlyName);
+
+  CreateHandle();
+
+  uint16_t num_services;
+  PBTH_LE_GATT_SERVICE services = GetGattServices(&num_services);
+  UGATTService::InitServicesData(services, num_services);
+
+  for (int i = 0; i < num_services; i++) {
+    UGATTService* newService = NewObject<UGATTService>();
+    newService->Init(i);
+    
+    uint16_t num_characteristics;
+    PBTH_LE_GATT_CHARACTERISTIC service_characteristics = GetGATTCharacteristics(newService, &num_characteristics);
+    for (int j = 0; j < num_characteristics; j++) {
+      UGATTCharacteristic* newCharacteristic = NewObject<UGATTCharacteristic>();
+      newCharacteristic->init(j, i, false, false, false);
+      deviceCharacteristics.Add(newCharacteristic);
+    }
+    newService->InitCharacteristics(service_characteristics);
+    deviceServices.Add(newService);
+  }
+
+  
+
 }
 
 void UBLEDevice::Path(FString p) {
@@ -37,24 +68,164 @@ void UBLEDevice::CreateHandle() {
   }
 }
 
-void UBLEDevice::BeginDestroy() {
+bool UBLEDevice::IsConnected() {
+  uint32_t connection = GetDevicePropertyInt(EDeviceProperty::PE_ConnectionStatus);
+  if (connection &DISPLAY_DEVICE_DISCONNECT) {
+    return false;
+  }
+  return true;
+}
+
+void UBLEDevice::Reset() {
   if (deviceHandle != nullptr) {
     CloseHandle(deviceHandle);
   }
+  if (deviceInfo != nullptr) {
+    SetupDiDestroyDeviceInfoList(deviceInfo);
+  }
+}
+
+void UBLEDevice::BeginDestroy() {
+  Reset();
   Super::BeginDestroy();
+}
+
+FString UBLEDevice::GetDeviceRegistryProperty(EDeviceRegistryProperty devProperty) {
+  DWORD nameData;
+  LPSTR nameBuffer = NULL;
+  DWORD nameBufferSize = 0;
+
+  SetupDiGetDeviceRegistryProperty(
+    deviceInfo,
+    &deviceInfoData,
+    (DWORD)devProperty,
+    NULL,
+    NULL,
+    0,
+    &nameBufferSize
+  );
+
+  //We use the TArray from UE4 instead of allocating the memory ourselfs.
+  //The TCHAT is to make sure that we are not affected by the encoding of characters
+  //In this case is a wide_char
+  TArray<TCHAR> value;
+  //Wide chars use 2 bytes for one char so we only need half of the required size
+  value.AddUninitialized(nameBufferSize * 0.5);
+
+  SetupDiGetDeviceRegistryProperty(
+    deviceInfo,
+    &deviceInfoData,
+    (DWORD)devProperty,
+    &nameData,
+    (PBYTE)value.GetData(),
+    nameBufferSize,
+    &nameBufferSize
+  );
+
+  FString result = value.GetData();
+  return result;
+}
+
+uint32_t UBLEDevice::GetDevicePropertyInt(EDeviceProperty devProperty) {
+  DWORD requiredLength;
+  DEVPROPTYPE prop_type;
+
+  BOOL success = SetupDiGetDeviceProperty(
+    deviceInfo,
+    &deviceInfoData,
+    &DEVPKEY_Device_DevNodeStatus,
+    &prop_type,
+    NULL,
+    0,
+    &requiredLength,
+    0
+  );
+
+  if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+  {
+    //error
+  }
+
+  //We use the TArray from UE4 instead of allocating the memory ourselfs.
+  //TArray<uint8_t> value;
+  //
+  //value.AddUninitialized(requiredLength);
+  ULONG value;
+
+  DWORD actual_length = requiredLength;
+
+  SetupDiGetDeviceProperty(
+    deviceInfo,
+    &deviceInfoData,
+    &DEVPKEY_Device_DevNodeStatus,
+    &prop_type,
+    (PBYTE)&value,
+    actual_length,
+    &requiredLength,
+    0
+  );
+
+  if (actual_length != requiredLength) {
+    //error
+  }
+
+  return value;
+}
+
+FString UBLEDevice::GetDeviceInterfaceDetail(EDeviceInterfaceDetail devIntData) {
+  DWORD interfaceDataSize = 0;
+  //Special call to get the size of the data
+  SetupDiGetDeviceInterfaceDetail(
+    deviceInfo,
+    &deviceInterfaceData,
+    NULL,
+    NULL,
+    &interfaceDataSize,
+    NULL);
+
+  PSP_DEVICE_INTERFACE_DETAIL_DATA pDevIntDetData = (PSP_DEVICE_INTERFACE_DETAIL_DATA)malloc(
+    sizeof(PSP_DEVICE_INTERFACE_DETAIL_DATA) + interfaceDataSize
+  );
+
+  memset(pDevIntDetData, 0, sizeof(PSP_DEVICE_INTERFACE_DETAIL_DATA) + interfaceDataSize);
+  pDevIntDetData->cbSize = sizeof(PSP_DEVICE_INTERFACE_DETAIL_DATA);
+  SetupDiGetDeviceInterfaceDetail(
+    deviceInfo,
+    &deviceInterfaceData,
+    pDevIntDetData,
+    interfaceDataSize,
+    &interfaceDataSize,
+    &deviceInfoData
+  );
+  FString path = pDevIntDetData->DevicePath;
+  int size = pDevIntDetData->cbSize;
+  free(pDevIntDetData);
+
+  switch (devIntData) {
+  case EDeviceInterfaceDetail::IE_Path:
+    return path;
+  case EDeviceInterfaceDetail::IE_Size:
+    return FString::FromInt(size);
+  default:
+    return FString();
+  }
+
 }
 
 //Get the characteristics of a device
 //Based in the example provided by Microsoft at the oficial API
 //https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattgetservices
-void UBLEDevice::TestGetCharacteristics() {
-  if (!ready_) return;
+PBTH_LE_GATT_CHARACTERISTIC UBLEDevice::GetGATTCharacteristics(const class UGATTService* service, uint16_t* numCharacteristics) {
+  
+  PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer = nullptr;
+  
+  if (!ready_) return pCharacteristicsBuffer;
 
   USHORT charBufferSize;
 
   HRESULT result = BluetoothGATTGetCharacteristics(
     deviceHandle,
-    pServiceBuffer,
+    service->getData(),
     0,
     NULL,
     &charBufferSize,
@@ -65,8 +236,7 @@ void UBLEDevice::TestGetCharacteristics() {
     //Error
   }
 
-  //Made a global as we need it to get the characteristics
-  //PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
+  
   if (charBufferSize > 0) {
     GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("The device has %i Characteristics"), charBufferSize));
     //std::cout << "The device has  " << charBufferSize << " Characteristics." << std::endl;
@@ -83,7 +253,7 @@ void UBLEDevice::TestGetCharacteristics() {
   USHORT num_characteristics = 0;
   result = BluetoothGATTGetCharacteristics(
     deviceHandle,
-    pServiceBuffer,
+    service->getData(),
     charBufferSize,
     pCharacteristicsBuffer,
     &num_characteristics,
@@ -92,24 +262,27 @@ void UBLEDevice::TestGetCharacteristics() {
 
   for (USHORT i = 0; i < charBufferSize; i++) {
     GUID guid = (pCharacteristicsBuffer + i)->CharacteristicUuid.Value.LongUuid;
-
-    OLECHAR* guidString;
-    StringFromCLSID(guid, &guidString);
-    std::cout << " Characteristic " << i << ": Characteristic Short UUID(" << (pCharacteristicsBuffer + i)->CharacteristicUuid.Value.ShortUuid << ") Characteristic Long UUID(" << guidString << ") with attribute handle "
+    //printf("\n Characteristic %i with GUID: %#010x \n", i, guid.Data1);
+    std::cout << " with attribute handle "
       << (pCharacteristicsBuffer + i)->AttributeHandle << " from service: " << (pCharacteristicsBuffer + i)->ServiceHandle << std::endl;
   }
-
+  *numCharacteristics = num_characteristics;
   if (num_characteristics != charBufferSize) {
     //Missmatch between buffer size and actual buffer size
+    *numCharacteristics = 0;
   }
+
+  return pCharacteristicsBuffer;
 }
 
 //Get the services of a device
 //Similar to get services, an example can alos be found at the oficial API
 //https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattgetcharacteristics
-void UBLEDevice::TestGetGattServices() {
+PBTH_LE_GATT_SERVICE UBLEDevice::GetGattServices(uint16_t* numServices) {
 
-  if (!ready_) return;
+  PBTH_LE_GATT_SERVICE pServiceBuffer = nullptr;
+
+  if (!ready_) return pServiceBuffer;
 
   USHORT serviceBufferCount;
   HRESULT result = BluetoothGATTGetServices(
@@ -144,30 +317,37 @@ void UBLEDevice::TestGetGattServices() {
     &num_services,
     BLUETOOTH_GATT_FLAG_NONE
   );
-
+  *numServices = num_services;
   if (num_services != serviceBufferCount) {
     //Missmatch between buffer size and actual buffer size
+    *numServices = 0;
   }
 
   for (USHORT i = 0; i < num_services; i++) {
     GUID guid = (pServiceBuffer + i)->ServiceUuid.Value.LongUuid;
-
-    OLECHAR* guidString;
-    StringFromCLSID(guid, &guidString);
-    std::cout << " Service " << i << ": Service Short UUID(" << (pServiceBuffer + i)->ServiceUuid.Value.ShortUuid << ") Service Long UUID(" << guidString << ") with attribute handle " << (pServiceBuffer + i)->AttributeHandle << std::endl;
+    //printf("\n Service %i with GUID: %#010x \n", i, guid.Data1);
+    std::cout << "with attribute handle " << (pServiceBuffer + i)->AttributeHandle << std::endl;
   }
+
+  return pServiceBuffer;
 }
 
 //Get the descriptors of a characteristic
 //Similar to get services, an example can alos be found at the oficial API
 //https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattgetdescriptors
-void UBLEDevice::TestGetDescriptors() {
 
-  if (!ready_) return;
+PBTH_LE_GATT_DESCRIPTOR UBLEDevice::getDescriptors(const UGATTCharacteristic& characteristic, uint16_t *numDescriptors) {
+  
+  PBTH_LE_GATT_DESCRIPTOR pDescriptorBuffer = nullptr;
+
+  if (!ready_) return pDescriptorBuffer;
 
   USHORT descriptorBufferSize;
   PBTH_LE_GATT_CHARACTERISTIC currGattChar;
-  currGattChar = &pCharacteristicsBuffer[2];
+  //We get the service that has the raw data of the characteristics
+  UGATTService* s = deviceServices[characteristic.service_id()];
+  //Using the id of the characteristic we access the data of the characteristic
+  currGattChar = &(s->getCharacteristicsData()[characteristic.id()]);
   HRESULT result = BluetoothGATTGetDescriptors(
     deviceHandle,
     currGattChar,
@@ -179,17 +359,15 @@ void UBLEDevice::TestGetDescriptors() {
 
   if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != result) {
     //Error
-    return;
+    return pDescriptorBuffer;
   }
-
-  PBTH_LE_GATT_DESCRIPTOR pDescriptorBuffer = nullptr;
 
   if (descriptorBufferSize > 0) {
     pDescriptorBuffer = (PBTH_LE_GATT_DESCRIPTOR)malloc(sizeof(BTH_LE_GATT_DESCRIPTOR)*descriptorBufferSize);
   }
-  if (nullptr == pCharacteristicsBuffer) {
+  if (nullptr == pDescriptorBuffer) {
     //Error no more memory
-    return;
+    return pDescriptorBuffer;
   }
 
   //We set the initial value of the buffer to 0
@@ -199,13 +377,41 @@ void UBLEDevice::TestGetDescriptors() {
   USHORT num_descriptors;
   result = BluetoothGATTGetDescriptors(
     deviceHandle,
-    pCharacteristicsBuffer,
+    currGattChar,
     descriptorBufferSize,
     pDescriptorBuffer,
     &num_descriptors,
     BLUETOOTH_GATT_FLAG_NONE
   );
+  *numDescriptors = num_descriptors;
   if (num_descriptors != descriptorBufferSize) {
     //Missmatch between buffer size and actual buffer size
+    *numDescriptors = 0;
+  }
+
+  return pDescriptorBuffer;
+  
+}
+
+//To be able to get notify we need to suscribe to an event setting the Descriptor as Microsoft 
+//indicates us
+//https://docs.microsoft.com/es-es/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattsetdescriptorvalue?redirectedfrom=MSDN
+void UBLEDevice::PrepareCharacteristicForNotify(const UGATTCharacteristic& characteristic) {
+
+  uint16_t num_descriptors;
+  PBTH_LE_GATT_DESCRIPTOR pDescriptorBuffer = getDescriptors(characteristic, &num_descriptors);
+
+  for (int i = 0; i < num_descriptors; i++) {
+    BTH_LE_GATT_DESCRIPTOR_VALUE newValue;
+
+    memset(&newValue, 0, sizeof(newValue));
+
+    newValue.DescriptorType = ClientCharacteristicConfiguration;
+    newValue.ClientCharacteristicConfiguration.IsSubscribeToNotification = true;
+
+    HRESULT result = BluetoothGATTSetDescriptorValue(deviceHandle,
+      &pDescriptorBuffer[i],
+      &newValue,
+      BLUETOOTH_GATT_FLAG_NONE);
   }
 }

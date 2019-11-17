@@ -2,57 +2,30 @@
 
 #pragma once
 
-#pragma comment(lib, "SetupAPI")
-#pragma comment(lib, "BluetoothApis.lib")
-#pragma warning( disable : 4068 )
-
-#define NTDDI_VERSION NTDDI_WIN8
-#define _WIN32_WINNT _WIN32_WINNT_WIN8
-
-
-//Unreal need the redefinition of the setup api macros
-
-//Redefinition used to indicate windows platform
-//https://docs.microsoft.com/en-us/windows/win32/api/setupapi/ns-setupapi-sp_altplatform_info_v2
-// V1 is for windows lesser than XP and V2 from XP to Vista
-#define USE_SP_ALTPLATFORM_INFO_V1 0
-#define USE_SP_ALTPLATFORM_INFO_V3 1
-
-//Define this identifier only if your component must run on Windows 98 or Millennium Edition, or on Windows NT. 
-//https://docs.microsoft.com/en-us/windows/win32/api/setupapi/ns-setupapi-sp_drvinfo_data_v1_w
-#define USE_SP_DRVINFO_DATA_V1 0
-
-//TODO no info could be found about this two, for now set to 0 as V1 is usually for lower windows version
-//observing the others
-#define USE_SP_BACKUP_QUEUE_PARAMS_V1 0
-#define USE_SP_INF_SIGNER_INFO_V1 0
-
-
-#include "AllowWindowsPlatformTypes.h"
-#include "Windows/COMPointer.h"
-
-#include <windows.h>
-#include <stdio.h>
-#include <tchar.h>
-#include <setupapi.h>
-#include <devguid.h>
-#include <regstr.h>
-#include <bthdef.h>
-#include <bluetoothleapis.h>
-
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <locale>
-////GUID_DEVINTERFACE_* values
-#include <uuids.h>
-
-
-#include "HideWindowsPlatformTypes.h"
+#include "bleapi_includes.h"
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "BLEDevice.generated.h"
+
+
+UENUM(BlueprintType)
+enum class EDeviceRegistryProperty : uint8 {
+  PE_FriendlyName = SPDRP_FRIENDLYNAME UMETA(DisplayName = "Name"),
+  PE_ClassGuid = SPDRP_CLASSGUID UMETA(DisplayName = "ClassGuid"),
+  PE_TypeDevice = SPDRP_DEVTYPE UMETA(DisplayName = "DeviceType")
+};
+
+UENUM(BlueprintType)
+enum class EDeviceProperty : uint8 {
+  PE_ConnectionStatus = SPDRP_FRIENDLYNAME UMETA(DisplayName = "Connection")
+};
+
+UENUM(BlueprintType)
+enum class EDeviceInterfaceDetail : uint8 {
+  IE_Path UMETA(DisplayName = "Path"),
+  IE_Size  UMETA(DisplayName = "ClassGuid")
+};
 
 /**
  * 
@@ -66,7 +39,7 @@ public:
 
   UBLEDevice();
 
-  UBLEDevice(FString p);
+  //UBLEDevice(HDEVINFO info, SP_DEVINFO_DATA infoData, SP_DEVICE_INTERFACE_DATA interfaceData);
 
   UFUNCTION()
     void FriendlyName(FString fn);
@@ -77,7 +50,12 @@ public:
   UFUNCTION()
     void CreateHandle();
 
+  UFUNCTION(BlueprintCallable)
+    bool IsConnected();
+
   virtual void BeginDestroy() override;
+
+  void Init(HDEVINFO info, SP_DEVINFO_DATA infoData, SP_DEVICE_INTERFACE_DATA interfaceData);
 	
 private:
 
@@ -90,20 +68,49 @@ private:
   UPROPERTY()
     bool ready_;
 
+  FString GetDeviceRegistryProperty(EDeviceRegistryProperty devProperty);
+
+  //Device Propperty can return different kinds of values, for now we are using it to get connection status
+  //as this is an int we only treat that right now. Function may need rework if different return options
+  //want to be supported.
+  uint32_t GetDevicePropertyInt(EDeviceProperty devProperty);
+
+  FString GetDeviceInterfaceDetail(EDeviceInterfaceDetail devIntData);
+
+  //Device info
+  HDEVINFO deviceInfo;
+
+  //Device info data
+  SP_DEVINFO_DATA deviceInfoData;
+
+  //Device interface detail
+  SP_DEVICE_INTERFACE_DATA deviceInterfaceData;
+
   //Handle to use the device
   HANDLE deviceHandle;
 
   //Services of the device
-  PBTH_LE_GATT_SERVICE pServiceBuffer;
+  //PBTH_LE_GATT_SERVICE pServiceBuffer;
 
   //Characteristics of the device
-  PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
+  //PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
 	
 public:
-  void TestGetGattServices();
+  PBTH_LE_GATT_SERVICE GetGattServices(uint16_t* numServices);
 
-  void TestGetCharacteristics();
+  PBTH_LE_GATT_CHARACTERISTIC GetGATTCharacteristics(const class UGATTService* service, uint16_t* numCharacteristics);
 
-  void TestGetDescriptors();
+protected:
+  void Reset();
+
+  void PrepareCharacteristicForNotify(const class UGATTCharacteristic& characteristic);
+
+  PBTH_LE_GATT_DESCRIPTOR getDescriptors(const class UGATTCharacteristic& characteristic, uint16_t *numDescriptors);
+
+  UPROPERTY()
+    TArray<class UGATTCharacteristic*> deviceCharacteristics;
+
+  UPROPERTY()
+  TArray<class UGATTService*> deviceServices;
 
 };
