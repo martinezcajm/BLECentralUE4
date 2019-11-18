@@ -22,7 +22,9 @@ void UBLEDevice::Init(HDEVINFO info, SP_DEVINFO_DATA infoData, SP_DEVICE_INTERFA
   path_ = GetDeviceInterfaceDetail(EDeviceInterfaceDetail::IE_Path);
 
   friendlyName_ = GetDeviceRegistryProperty(EDeviceRegistryProperty::PE_FriendlyName);
+}
 
+void UBLEDevice::Connect() {
   CreateHandle();
 
   uint16_t num_services;
@@ -32,20 +34,37 @@ void UBLEDevice::Init(HDEVINFO info, SP_DEVINFO_DATA infoData, SP_DEVICE_INTERFA
   for (int i = 0; i < num_services; i++) {
     UGATTService* newService = NewObject<UGATTService>();
     newService->Init(i);
-    
+
     uint16_t num_characteristics;
     PBTH_LE_GATT_CHARACTERISTIC service_characteristics = GetGATTCharacteristics(newService, &num_characteristics);
     for (int j = 0; j < num_characteristics; j++) {
       UGATTCharacteristic* newCharacteristic = NewObject<UGATTCharacteristic>();
-      newCharacteristic->init(j, i, false, false, false);
+      //Unreal treats the warning (C4800) as an error so we need to cast BOOl to bool manualy
+      //error C4800: 'BOOLEAN': forcing value to bool 'true' or 'false' (performance warning)
+      bool notifable = (service_characteristics[j].IsNotifiable != FALSE);
+      bool readable = (service_characteristics[j].IsReadable != FALSE);
+      bool writable = (service_characteristics[j].IsWritable != FALSE);
+      bool writablewithoutresponse = (service_characteristics[j].IsWritableWithoutResponse != FALSE);
+
+      //We transform the hexadecimal data to string
+      //Unreal allows to make an string based in the value of a printf 
+      //FString test = FString::Printf(TEXT("GUID: %#010x"), service_characteristics[j].CharacteristicUuid.Value.LongUuid.Data1);
+      FString guid = ConvertGUIDtoString(service_characteristics[j].CharacteristicUuid.Value.LongUuid);
+      newCharacteristic->init(j, i, notifable, readable, writable, writablewithoutresponse, guid);
       deviceCharacteristics.Add(newCharacteristic);
     }
     newService->InitCharacteristics(service_characteristics);
     deviceServices.Add(newService);
   }
+}
 
-  
-
+FString UBLEDevice::ConvertGUIDtoString(const GUID guid) const {
+  FString result;
+  result = FString::Printf(TEXT("%#010x-%04x-%04x-%02x%02x%02x%02x%02x%02x%02x%02x"),
+    guid.Data1, guid.Data2, guid.Data3,
+    guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
+    guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+  return result;
 }
 
 void UBLEDevice::Path(FString p) {

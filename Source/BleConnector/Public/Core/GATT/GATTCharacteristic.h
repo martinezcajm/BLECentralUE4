@@ -40,7 +40,9 @@ public:
 
   uint16_t service_id() const;
 
-  void init(const uint16_t id, const uint16_t service_id, const bool notify, const bool read, const bool write);
+  void init(const uint16_t id, const uint16_t service_id,
+    const bool notify, const bool read, const bool writeresponse, const bool writenoresponse,
+    FString guid);
 	
 private:
 
@@ -48,7 +50,9 @@ private:
 
   bool read_;
 
-  bool write_;
+  bool write_with_response_;
+
+  bool write_without_response_;
 
   FString charGUID_;
 

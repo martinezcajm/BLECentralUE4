@@ -11,6 +11,7 @@ void AGameModeBLEP::BeginPlay() {
 
   CurrentLowEnergyCentral = NewObject<UBLECentral>();
   TArray<UBLEDevice*> devices =  CurrentLowEnergyCentral->SearchBLEDevices();
+  devices[1]->Connect();
   //devices[0]->CreateHandle();
   //The order matters!
   /*devices[1]->TestGetGattServices();

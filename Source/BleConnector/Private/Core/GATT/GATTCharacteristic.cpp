@@ -6,7 +6,8 @@
 UGATTCharacteristic::UGATTCharacteristic() : UObject() {
   notify_ = false;
   read_ = false;
-  write_ = false;
+  write_with_response_ = false;
+  write_without_response_ = false;
   id_ = 0;
   charGUID_ = "";
 }
@@ -28,7 +29,7 @@ bool UGATTCharacteristic::canBeRead() const {
 }
 
 bool UGATTCharacteristic::CanBeWritten() const {
-  return write_;
+  return write_with_response_ || write_without_response_;
 }
 
 FString UGATTCharacteristic::characteristicGUID() const {
@@ -43,10 +44,14 @@ uint16_t UGATTCharacteristic::service_id() const {
   return service_id_;
 }
 
-void UGATTCharacteristic::init(const uint16_t id, const uint16_t service_id, const bool notify, const bool read, const bool write) {
+void UGATTCharacteristic::init(const uint16_t id, const uint16_t service_id,
+  const bool notify, const bool read, const bool writeresponse, const bool writenoresponse,
+  FString guid) {
   id_ = id;
   service_id_ = service_id;
   notify_ = notify;
   read_ = read;
-  write_ = write;
+  write_with_response_ = writeresponse;
+  write_without_response_ = writenoresponse;
+  charGUID_ = guid;
 }

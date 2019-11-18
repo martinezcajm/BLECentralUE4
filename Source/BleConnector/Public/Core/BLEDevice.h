@@ -48,6 +48,9 @@ public:
     void Path(FString p);
 
   UFUNCTION()
+    void Connect();
+
+  UFUNCTION()
     void CreateHandle();
 
   UFUNCTION(BlueprintCallable)
@@ -112,5 +115,7 @@ protected:
 
   UPROPERTY()
   TArray<class UGATTService*> deviceServices;
+
+  FString ConvertGUIDtoString(const GUID guid) const;
 
 };
