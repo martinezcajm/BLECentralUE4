@@ -27,6 +27,38 @@ enum class EDeviceInterfaceDetail : uint8 {
   IE_Size  UMETA(DisplayName = "ClassGuid")
 };
 
+UENUM(BlueprintType)
+enum class ETypeValue : uint8 {
+  VE_UINT8 UMETA(DisplayName = "Uint8"),
+  VE_UINT16  UMETA(DisplayName = "Uint16"),
+  VE_STRING UMETA(DisplayName = "String"),
+  VE_ERROR UMETA(DisplayName = "Error")
+};
+
+USTRUCT()
+struct FGATTValue {
+  GENERATED_USTRUCT_BODY()
+
+  UPROPERTY()
+  ETypeValue type;
+
+  //TODO this would be better with an union. Unfortunately right now UE4 doesn't support
+  //unions as propperties so can't be used at bluepritns
+  //UPROPERTY()
+  //  typedef union value {
+  //  uint16 ui16;
+  //  uint8 ui8;
+  //  FString s;
+  //} v;
+
+  UPROPERTY()
+    FString s;
+
+  UPROPERTY()
+    uint8 ui8;
+
+};
+
 /**
  * 
  */
@@ -55,6 +87,12 @@ public:
 
   UFUNCTION(BlueprintCallable)
     bool IsConnected();
+
+  UFUNCTION()
+    FGATTValue GetCharacteristicValue(class UGATTCharacteristic* characteristic);
+
+  UFUNCTION()
+    void SetCharacteristicValue(class UGATTCharacteristic* characteristic, bool reliable_write = false);
 
   virtual void BeginDestroy() override;
 
@@ -110,12 +148,19 @@ protected:
 
   PBTH_LE_GATT_DESCRIPTOR getDescriptors(const class UGATTCharacteristic& characteristic, uint16_t *numDescriptors);
 
+  FString ConvertGUIDtoString(const GUID guid) const;
+
+  PBTH_LE_GATT_CHARACTERISTIC getCharacteristicData(const class UGATTCharacteristic& characteristic);
+
+  PBTH_LE_GATT_SERVICE getCharacteristicServiceData(const class UGATTCharacteristic& characteristic);
+
+  HANDLE GetBLEHandle(GUID AGuid);
+
+public:
   UPROPERTY()
     TArray<class UGATTCharacteristic*> deviceCharacteristics;
 
   UPROPERTY()
-  TArray<class UGATTService*> deviceServices;
-
-  FString ConvertGUIDtoString(const GUID guid) const;
+    TArray<class UGATTService*> deviceServices;
 
 };

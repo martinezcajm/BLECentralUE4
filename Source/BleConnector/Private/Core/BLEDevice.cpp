@@ -78,13 +78,75 @@ void UBLEDevice::FriendlyName(FString fn) {
 void UBLEDevice::CreateHandle() {
   if (path_ != "") {
     if (deviceHandle != nullptr) CloseHandle(deviceHandle);
-    deviceHandle = CreateFile(*path_, GENERIC_WRITE | GENERIC_READ, NULL, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    deviceHandle = CreateFile(*path_, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     if (deviceHandle == INVALID_HANDLE_VALUE) {
       //TODO error controlling
       return;
     }
     ready_ = true;
   }
+}
+
+HANDLE UBLEDevice::GetBLEHandle(GUID AGuid) {
+  HDEVINFO hDeviceInfo;
+  SP_DEVICE_INTERFACE_DATA deviceInterfaceData;
+  SP_DEVINFO_DATA deviceInfoData;
+
+  //DWORD deviceIndex = 0;
+  GUID BluetoothInterfaceGUID = AGuid;
+  HANDLE hComm = NULL;
+
+  hDeviceInfo = SetupDiGetClassDevs(&BluetoothInterfaceGUID, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+
+  if (hDeviceInfo == INVALID_HANDLE_VALUE) {
+    return NULL;
+  }
+
+  // Enumerate through all devices in Set.
+  memset(&deviceInfoData, 0, sizeof(SP_DEVINFO_DATA));
+  deviceInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+
+  memset(&deviceInterfaceData, 0, sizeof(SP_DEVICE_INTERFACE_DATA));
+  deviceInterfaceData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+
+  for (DWORD i = 0; SetupDiEnumDeviceInterfaces(hDeviceInfo, NULL, &BluetoothInterfaceGUID, i, &deviceInterfaceData); i++) {
+    SP_DEVICE_INTERFACE_DETAIL_DATA DeviceInterfaceDetailData;
+
+    DeviceInterfaceDetailData.cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+
+    DWORD size = 0;
+
+    if (!SetupDiGetDeviceInterfaceDetail(hDeviceInfo, &deviceInterfaceData, NULL, 0, &size, 0))
+    {
+      int err = GetLastError();
+
+      if (err == ERROR_NO_MORE_ITEMS) break;
+
+      PSP_DEVICE_INTERFACE_DETAIL_DATA pInterfaceDetailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA)GlobalAlloc(GPTR, size);
+
+      pInterfaceDetailData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+
+      if (!SetupDiGetDeviceInterfaceDetail(hDeviceInfo, &deviceInterfaceData, pInterfaceDetailData, size, &size, &deviceInfoData))
+        break;
+
+      hComm = CreateFile(
+        pInterfaceDetailData->DevicePath,
+        GENERIC_WRITE | GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL,
+        OPEN_EXISTING,
+        0,
+        NULL);
+
+      GlobalFree(pInterfaceDetailData);
+    }
+  
+  
+  }
+
+  SetupDiDestroyDeviceInfoList(hDeviceInfo);
+  return hComm;
+
 }
 
 bool UBLEDevice::IsConnected() {
@@ -362,11 +424,13 @@ PBTH_LE_GATT_DESCRIPTOR UBLEDevice::getDescriptors(const UGATTCharacteristic& ch
   if (!ready_) return pDescriptorBuffer;
 
   USHORT descriptorBufferSize;
-  PBTH_LE_GATT_CHARACTERISTIC currGattChar;
-  //We get the service that has the raw data of the characteristics
-  UGATTService* s = deviceServices[characteristic.service_id()];
-  //Using the id of the characteristic we access the data of the characteristic
-  currGattChar = &(s->getCharacteristicsData()[characteristic.id()]);
+  ////We get the service that has the raw data of the characteristics
+  //UGATTService* s = deviceServices[characteristic.service_id()];
+  ////Using the id of the characteristic we access the data of the characteristic
+  //currGattChar = &(s->getCharacteristicsData()[characteristic.id()]);
+
+  PBTH_LE_GATT_CHARACTERISTIC currGattChar = getCharacteristicData(characteristic);
+
   HRESULT result = BluetoothGATTGetDescriptors(
     deviceHandle,
     currGattChar,
@@ -433,4 +497,147 @@ void UBLEDevice::PrepareCharacteristicForNotify(const UGATTCharacteristic& chara
       &newValue,
       BLUETOOTH_GATT_FLAG_NONE);
   }
+}
+
+//https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattgetcharacteristicvalue
+FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristic) {
+  FGATTValue result;
+  memset(&result, 0, sizeof(FGATTValue));
+  if (!characteristic->canBeRead()) {
+    result.type = ETypeValue::VE_ERROR;
+    result.s = FString::Printf(TEXT("Error: this characteristic is specified as no readable"));
+    return result;
+  }
+
+  USHORT charValueDataSize = 0;
+
+  /*UGATTService* service = deviceServices[characteristic->service_id()];
+  PBTH_LE_GATT_CHARACTERISTIC current_characteristic = &(service->getCharacteristicsData()[characteristic->id()]);*/
+  PBTH_LE_GATT_CHARACTERISTIC current_characteristic = getCharacteristicData(*characteristic);
+
+  PBTH_LE_GATT_SERVICE service = getCharacteristicServiceData(*characteristic);
+  GUID service_GUID;
+  //We need a handle of the service, for that we need to call the CreateFile with the UUID of the service
+  if (service->ServiceUuid.IsShortUuid) {
+    //To convert a shourt UUID (16 bits) we need to use the BASE bluetooth UUID 00000000-0000-1000-8000-00805F9B34FB
+    //bthledef has it already defined it.
+    //The UUID of the shourt UUID will follow the next format: 0000xxxx-0000-1000-8000-00805F9B34FB
+    //where xxxx is the 16 bits of the short UUID
+    GUID Bluetooth_base_UUID = BTH_LE_ATT_BLUETOOTH_BASE_GUID;
+    //Data1 are the first 32 bits of our guid so there is where our shrt UUID goes
+    Bluetooth_base_UUID.Data1 = service->ServiceUuid.Value.ShortUuid;
+    service_GUID = Bluetooth_base_UUID;
+  }
+  else {
+    service_GUID = service->ServiceUuid.Value.LongUuid;
+  }
+
+  HANDLE service_handle = GetBLEHandle(service_GUID);
+
+  HRESULT hr = BluetoothGATTGetCharacteristicValue(service_handle,
+    current_characteristic,
+    0,
+    NULL,
+    &charValueDataSize,
+    BLUETOOTH_GATT_FLAG_NONE
+  );
+
+
+  if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
+    result.type = ETypeValue::VE_ERROR;
+    result.s = FString::Printf(TEXT("Error: Problem trying to read the characteristic"));
+    return result;
+  }
+  PBTH_LE_GATT_CHARACTERISTIC_VALUE pCharValueBuffer;
+  pCharValueBuffer = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)malloc(charValueDataSize);
+
+  if (NULL == pCharValueBuffer) {
+    result.type = ETypeValue::VE_ERROR;
+    result.s = FString::Printf(TEXT("Error: The system has no memory available"));
+    return result;
+  }
+
+  memset(pCharValueBuffer, 0, charValueDataSize);
+
+  hr = BluetoothGATTGetCharacteristicValue(service_handle,
+    current_characteristic,
+    (ULONG)charValueDataSize,
+    pCharValueBuffer,
+    NULL,
+    BLUETOOTH_GATT_FLAG_NONE);
+
+  if (S_OK != hr) {
+    result.type = ETypeValue::VE_ERROR;
+    result.s = FString::Printf(TEXT("Error: Problem reading the characteristic BluetoothGATTGetCharacteristicValue"));
+    return result;
+  }
+  result.type = ETypeValue::VE_STRING;
+  for (ULONG iii = 0; iii< pCharValueBuffer->DataSize; iii++) {
+    result.s += FString::Printf(TEXT("%d"), pCharValueBuffer->Data[iii]);
+  }
+
+
+  free(pCharValueBuffer);
+  pCharValueBuffer = NULL;
+
+  return result;
+}
+
+//https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattbeginreliablewrite
+//https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattsetcharacteristicvalue
+void UBLEDevice::SetCharacteristicValue(UGATTCharacteristic* characteristic, bool reliable_write) {
+
+  if (!characteristic->CanBeWritten()) {
+    return;
+  }
+  HRESULT hr;
+
+  BTH_LE_GATT_RELIABLE_WRITE_CONTEXT ReliableWriteContext = NULL;
+  if (reliable_write) {
+    hr = BluetoothGATTBeginReliableWrite(deviceHandle,
+      &ReliableWriteContext,
+      BLUETOOTH_GATT_FLAG_NONE);
+    if (!SUCCEEDED(hr)) {
+      //Reliable write was not possible, pass the error
+    }
+  }
+
+  BTH_LE_GATT_CHARACTERISTIC_VALUE newValue;
+
+  RtlZeroMemory(&newValue, (sizeof(newValue)));
+
+  //TODO analyze how the data will be passed
+  /*newValue.DataSize = sizeof(valueData);
+  newValue.Data = (UCHAR*)&valueData;*/
+
+  PBTH_LE_GATT_CHARACTERISTIC cuurentCharacteristic = getCharacteristicData(*characteristic);
+
+  // Set the new characteristic value
+  hr = BluetoothGATTSetCharacteristicValue(deviceHandle,
+    cuurentCharacteristic,
+    &newValue,
+    NULL,
+    BLUETOOTH_GATT_FLAG_NONE);
+
+  if (NULL != ReliableWriteContext) {
+    BluetoothGATTEndReliableWrite(deviceHandle,
+      ReliableWriteContext,
+      BLUETOOTH_GATT_FLAG_NONE);
+  }
+
+}
+
+PBTH_LE_GATT_CHARACTERISTIC UBLEDevice::getCharacteristicData(const UGATTCharacteristic& characteristic) {
+  //We get the service that has the raw data of the characteristics
+  UGATTService* service = deviceServices[characteristic.service_id()];
+
+  //Using the id of the characteristic we access the data of the characteristic
+  return &(service->getCharacteristicsData()[characteristic.id()]);
+}
+
+PBTH_LE_GATT_SERVICE UBLEDevice::getCharacteristicServiceData(const UGATTCharacteristic& characteristic) {
+  //We get the service that has the raw data of the characteristics
+  UGATTService* service = deviceServices[characteristic.service_id()];
+
+  return service->getData();
 }
