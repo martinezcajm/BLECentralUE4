@@ -55,3 +55,16 @@ void UGATTCharacteristic::init(const uint16_t id, const uint16_t service_id,
   write_without_response_ = writenoresponse;
   charGUID_ = guid;
 }
+
+void UGATTCharacteristic::GattEventNotificationCallback(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context) {
+  //We need to get the object from the context
+  UGATTCharacteristic* pThis = static_cast<UGATTCharacteristic*>(Context);
+  //Once we have it if a callback has been assigned to the characteristic we call it
+  if (pThis->event_callback != nullptr) {
+    pThis->event_callback();
+  }
+}
+
+void UGATTCharacteristic::setCallback(void(*callback)()) {
+  event_callback = callback;
+}

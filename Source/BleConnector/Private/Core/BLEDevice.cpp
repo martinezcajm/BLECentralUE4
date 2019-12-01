@@ -5,6 +5,13 @@
 #include "GATTService.h"
 #include "Engine/Engine.h"
 
+//Common data using the Structures of arrays (SOA) layout to have all the data regarding
+//the notify callbacks for the characteristics togheter in memory.
+//static struct {
+//  TArray<void(*)()> callbacks;
+//  uint8_t numCharacteristics = 0;
+//}CallbackCharacteristicData;
+
 UBLEDevice::UBLEDevice() : UObject() {
   deviceHandle = nullptr;
   //pServiceBuffer = nullptr;
@@ -484,19 +491,115 @@ void UBLEDevice::PrepareCharacteristicForNotify(const UGATTCharacteristic& chara
   uint16_t num_descriptors;
   PBTH_LE_GATT_DESCRIPTOR pDescriptorBuffer = getDescriptors(characteristic, &num_descriptors);
 
+  PBTH_LE_GATT_SERVICE service = getCharacteristicServiceData(characteristic);
+
+  //We need a handle of the service, for that we need to call the CreateFile with the UUID of the service
+  GUID service_GUID = GetGuidFromService(service);
+
+  HANDLE service_handle = GetBLEHandle(service_GUID);
+
+
+  HRESULT hr;
+
   for (int i = 0; i < num_descriptors; i++) {
-    BTH_LE_GATT_DESCRIPTOR_VALUE newValue;
+    
+    PBTH_LE_GATT_DESCRIPTOR  currGattDescriptor = &pDescriptorBuffer[i];
 
-    memset(&newValue, 0, sizeof(newValue));
-
-    newValue.DescriptorType = ClientCharacteristicConfiguration;
-    newValue.ClientCharacteristicConfiguration.IsSubscribeToNotification = true;
-
-    HRESULT result = BluetoothGATTSetDescriptorValue(deviceHandle,
-      &pDescriptorBuffer[i],
-      &newValue,
+    USHORT descValueDataSize;
+    hr = BluetoothGATTGetDescriptorValue(
+      service_handle,
+      currGattDescriptor,
+      0,
+      NULL,
+      &descValueDataSize,
       BLUETOOTH_GATT_FLAG_NONE);
+
+    if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
+      //printf("BluetoothGATTGetDescriptorValue - Buffer Size %d", hr);
+    }
+
+    PBTH_LE_GATT_DESCRIPTOR_VALUE pDescValueBuffer = (PBTH_LE_GATT_DESCRIPTOR_VALUE)malloc(descValueDataSize);
+
+    if (NULL == pDescValueBuffer) {
+      //printf("pDescValueBuffer out of memory\r\n");
+    }
+    else {
+      memset(pDescValueBuffer, 0, descValueDataSize);
+    }
+
+    hr = BluetoothGATTGetDescriptorValue(
+      service_handle,
+      currGattDescriptor,
+      (ULONG)descValueDataSize,
+      pDescValueBuffer,
+      NULL,
+      BLUETOOTH_GATT_FLAG_NONE);
+    if (S_OK != hr) {
+      //printf("BluetoothGATTGetDescriptorValue - Actual Data %d", hr);
+    }
+    //you may also get a descriptor that is read (and not notify) andi am guessing the attribute handle is out of limits
+    // we set all descriptors that are notifiable to notify us via IsSubstcibeToNotification
+    if (currGattDescriptor->AttributeHandle < 255) {
+      BTH_LE_GATT_DESCRIPTOR_VALUE newValue;
+
+      memset(&newValue, 0, sizeof(newValue));
+
+      newValue.DescriptorType = ClientCharacteristicConfiguration;
+      newValue.ClientCharacteristicConfiguration.IsSubscribeToNotification = true;
+
+      HRESULT result = BluetoothGATTSetDescriptorValue(
+        service_handle,
+        &pDescriptorBuffer[i],
+        &newValue,
+        BLUETOOTH_GATT_FLAG_NONE);
+      }
+    
+    }
+
+}
+
+//https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattgetcharacteristicvalue
+//notice that this function won't free the memory allocated so its responsability of the one who called
+//this function to do it. This function only should be used by the BLEDevice class. Please use the
+//GetChatacteristicValue to get the value
+PBTH_LE_GATT_CHARACTERISTIC_VALUE UBLEDevice::GetCharacteristicValueIntern(PBTH_LE_GATT_CHARACTERISTIC characteristic, HANDLE service_handle, HRESULT *result) {
+  
+  USHORT charValueDataSize = 0;
+  
+  HRESULT hr = BluetoothGATTGetCharacteristicValue(service_handle,
+    characteristic,
+    0,
+    NULL,
+    &charValueDataSize,
+    BLUETOOTH_GATT_FLAG_NONE
+  );
+  *result = hr;
+
+  if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
+    return nullptr;
   }
+  PBTH_LE_GATT_CHARACTERISTIC_VALUE pCharValueBuffer;
+  pCharValueBuffer = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)malloc(charValueDataSize);
+
+  if (NULL == pCharValueBuffer) {       
+    return pCharValueBuffer;
+  }
+
+  memset(pCharValueBuffer, 0, charValueDataSize);
+
+  hr = BluetoothGATTGetCharacteristicValue(service_handle,
+    characteristic,
+    (ULONG)charValueDataSize,
+    pCharValueBuffer,
+    NULL,
+    BLUETOOTH_GATT_FLAG_NONE);
+
+  *result = hr;
+
+  if (S_OK != hr) {
+    return pCharValueBuffer;
+  }
+  return pCharValueBuffer;
 }
 
 //https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattgetcharacteristicvalue
@@ -511,81 +614,50 @@ FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristi
 
   USHORT charValueDataSize = 0;
 
-  /*UGATTService* service = deviceServices[characteristic->service_id()];
-  PBTH_LE_GATT_CHARACTERISTIC current_characteristic = &(service->getCharacteristicsData()[characteristic->id()]);*/
   PBTH_LE_GATT_CHARACTERISTIC current_characteristic = getCharacteristicData(*characteristic);
 
   PBTH_LE_GATT_SERVICE service = getCharacteristicServiceData(*characteristic);
-  GUID service_GUID;
+
   //We need a handle of the service, for that we need to call the CreateFile with the UUID of the service
-  if (service->ServiceUuid.IsShortUuid) {
-    //To convert a shourt UUID (16 bits) we need to use the BASE bluetooth UUID 00000000-0000-1000-8000-00805F9B34FB
-    //bthledef has it already defined it.
-    //The UUID of the shourt UUID will follow the next format: 0000xxxx-0000-1000-8000-00805F9B34FB
-    //where xxxx is the 16 bits of the short UUID
-    GUID Bluetooth_base_UUID = BTH_LE_ATT_BLUETOOTH_BASE_GUID;
-    //Data1 are the first 32 bits of our guid so there is where our shrt UUID goes
-    Bluetooth_base_UUID.Data1 = service->ServiceUuid.Value.ShortUuid;
-    service_GUID = Bluetooth_base_UUID;
-  }
-  else {
-    service_GUID = service->ServiceUuid.Value.LongUuid;
-  }
+  GUID service_GUID = GetGuidFromService(service);
 
   HANDLE service_handle = GetBLEHandle(service_GUID);
 
-  HRESULT hr = BluetoothGATTGetCharacteristicValue(service_handle,
-    current_characteristic,
-    0,
-    NULL,
-    &charValueDataSize,
-    BLUETOOTH_GATT_FLAG_NONE
-  );
+  HRESULT hr;
 
-
-  if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
-    result.type = ETypeValue::VE_ERROR;
-    result.s = FString::Printf(TEXT("Error: Problem trying to read the characteristic"));
-    return result;
-  }
-  PBTH_LE_GATT_CHARACTERISTIC_VALUE pCharValueBuffer;
-  pCharValueBuffer = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)malloc(charValueDataSize);
-
-  if (NULL == pCharValueBuffer) {
-    result.type = ETypeValue::VE_ERROR;
-    result.s = FString::Printf(TEXT("Error: The system has no memory available"));
-    return result;
-  }
-
-  memset(pCharValueBuffer, 0, charValueDataSize);
-
-  hr = BluetoothGATTGetCharacteristicValue(service_handle,
-    current_characteristic,
-    (ULONG)charValueDataSize,
-    pCharValueBuffer,
-    NULL,
-    BLUETOOTH_GATT_FLAG_NONE);
+  PBTH_LE_GATT_CHARACTERISTIC_VALUE pCharValueBuffer = GetCharacteristicValueIntern(current_characteristic,
+    service_handle, &hr);
 
   if (S_OK != hr) {
     result.type = ETypeValue::VE_ERROR;
     result.s = FString::Printf(TEXT("Error: Problem reading the characteristic BluetoothGATTGetCharacteristicValue"));
+    if (pCharValueBuffer != nullptr) free(pCharValueBuffer);
+    pCharValueBuffer = nullptr;
     return result;
   }
+
   result.type = ETypeValue::VE_STRING;
+  FString aux;
+  FString aux2;
   for (ULONG iii = 0; iii< pCharValueBuffer->DataSize; iii++) {
-    result.s += FString::Printf(TEXT("%d"), pCharValueBuffer->Data[iii]);
+    aux += FString::Printf(TEXT("%d"), pCharValueBuffer->Data[iii]);
+    aux2 += FString::Printf(TEXT("%c"), pCharValueBuffer->Data[iii]);
   }
+  result.s = aux2;
+  result.ui8 = FCString::Atoi(*aux);
+  //memcpy(&(result.s), &aux, aux.Len());
+  if(pCharValueBuffer != nullptr) free(pCharValueBuffer);
+  pCharValueBuffer = nullptr;
 
-
-  free(pCharValueBuffer);
-  pCharValueBuffer = NULL;
 
   return result;
 }
 
 //https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattbeginreliablewrite
 //https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattsetcharacteristicvalue
-void UBLEDevice::SetCharacteristicValue(UGATTCharacteristic* characteristic, bool reliable_write) {
+void UBLEDevice::SetCharacteristicValue(UGATTCharacteristic* characteristic, void* data, USHORT charValueDataSize, bool reliable_write) {
+
+  if (data == nullptr) return;
 
   if (!characteristic->CanBeWritten()) {
     return;
@@ -593,8 +665,24 @@ void UBLEDevice::SetCharacteristicValue(UGATTCharacteristic* characteristic, boo
   HRESULT hr;
 
   BTH_LE_GATT_RELIABLE_WRITE_CONTEXT ReliableWriteContext = NULL;
+
+  PBTH_LE_GATT_CHARACTERISTIC current_characteristic = getCharacteristicData(*characteristic);
+  PBTH_LE_GATT_SERVICE service = getCharacteristicServiceData(*characteristic);
+  //We need a handle of the service, for that we need to call the CreateFile with the UUID of the service
+  //GUID service_GUID = GetGuidFromService(service);
+  //HANDLE service_handle = GetBLEHandle(service_GUID);
+  GUID service_GUID;
+  if (service->ServiceUuid.IsShortUuid) {
+    service_GUID = ShortUuidToGuid(service->ServiceUuid.Value.ShortUuid);
+  }
+  else {
+    service_GUID = service->ServiceUuid.Value.LongUuid;
+  }
+
+  HANDLE service_handle = GetBLEHandle(service_GUID);
+
   if (reliable_write) {
-    hr = BluetoothGATTBeginReliableWrite(deviceHandle,
+    hr = BluetoothGATTBeginReliableWrite(service_handle,
       &ReliableWriteContext,
       BLUETOOTH_GATT_FLAG_NONE);
     if (!SUCCEEDED(hr)) {
@@ -602,28 +690,36 @@ void UBLEDevice::SetCharacteristicValue(UGATTCharacteristic* characteristic, boo
     }
   }
 
-  BTH_LE_GATT_CHARACTERISTIC_VALUE newValue;
+  //Maximum size possible, recommendation to avoid problems
+  USHORT maxCharValueDataSize = 512;
 
-  RtlZeroMemory(&newValue, (sizeof(newValue)));
+  PBTH_LE_GATT_CHARACTERISTIC_VALUE newValue;
+  newValue = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)malloc(maxCharValueDataSize + sizeof(BTH_LE_GATT_CHARACTERISTIC_VALUE));
 
-  //TODO analyze how the data will be passed
-  /*newValue.DataSize = sizeof(valueData);
-  newValue.Data = (UCHAR*)&valueData;*/
+  memset(newValue, 0, maxCharValueDataSize + sizeof(BTH_LE_GATT_CHARACTERISTIC_VALUE));
 
-  PBTH_LE_GATT_CHARACTERISTIC cuurentCharacteristic = getCharacteristicData(*characteristic);
+  newValue->DataSize = charValueDataSize;
+  memcpy(newValue->Data, (UCHAR*)data, charValueDataSize);
 
   // Set the new characteristic value
-  hr = BluetoothGATTSetCharacteristicValue(deviceHandle,
-    cuurentCharacteristic,
-    &newValue,
+  hr = BluetoothGATTSetCharacteristicValue(service_handle,
+    current_characteristic,
+    newValue,
     NULL,
-    BLUETOOTH_GATT_FLAG_NONE);
+    BLUETOOTH_GATT_FLAG_WRITE_WITHOUT_RESPONSE);
+
+  if (S_OK != hr) {
+    //Error
+    return;
+  }
 
   if (NULL != ReliableWriteContext) {
-    BluetoothGATTEndReliableWrite(deviceHandle,
+    hr = BluetoothGATTEndReliableWrite(service_handle,
       ReliableWriteContext,
       BLUETOOTH_GATT_FLAG_NONE);
   }
+
+  //if (newValue != nullptr) free(newValue);
 
 }
 
@@ -640,4 +736,69 @@ PBTH_LE_GATT_SERVICE UBLEDevice::getCharacteristicServiceData(const UGATTCharact
   UGATTService* service = deviceServices[characteristic.service_id()];
 
   return service->getData();
+}
+
+GUID UBLEDevice::ShortUuidToGuid(const USHORT uuid16byte) const {
+  //To convert a shourt UUID (16 bits) we need to use the BASE bluetooth UUID 00000000-0000-1000-8000-00805F9B34FB
+  //bthledef has it already defined it.
+  //The UUID of the shourt UUID will follow the next format: 0000xxxx-0000-1000-8000-00805F9B34FB
+  //where xxxx is the 16 bits of the short UUID
+  GUID Bluetooth_base_UUID = BTH_LE_ATT_BLUETOOTH_BASE_GUID;
+  //Data1 are the first 32 bits of our guid so there is where our shrt UUID goes
+  Bluetooth_base_UUID.Data1 = uuid16byte;
+  return Bluetooth_base_UUID;
+}
+
+GUID UBLEDevice::GetGuidFromService(const PBTH_LE_GATT_SERVICE service) const {
+  GUID service_GUID;
+  if (service->ServiceUuid.IsShortUuid) {
+    service_GUID = ShortUuidToGuid(service->ServiceUuid.Value.ShortUuid);
+  }
+  else {
+    service_GUID = service->ServiceUuid.Value.LongUuid;
+  }
+  return service_GUID;
+}
+
+//void UBLEDevice::GattEventNotificationCallback(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context) {
+//
+//}
+
+void UBLEDevice::ActivateNotify(class UGATTCharacteristic& characteristic, void(*callback)()) {
+  if (characteristic.canNotify()) {
+    
+    PrepareCharacteristicForNotify(characteristic);
+    PBTH_LE_GATT_CHARACTERISTIC current_characteristic = getCharacteristicData(characteristic);
+
+    PBTH_LE_GATT_SERVICE service = getCharacteristicServiceData(characteristic);
+
+    //We need a handle of the service, for that we need to call the CreateFile with the UUID of the service
+    GUID service_GUID = GetGuidFromService(service);
+
+    HANDLE service_handle = GetBLEHandle(service_GUID);
+
+    BTH_LE_GATT_EVENT_TYPE EventType = CharacteristicValueChangedEvent;
+
+    BLUETOOTH_GATT_VALUE_CHANGED_EVENT_REGISTRATION EventParameterIn;
+    EventParameterIn.Characteristics[0] = *current_characteristic;
+    EventParameterIn.NumCharacteristics = 1;
+
+    //TODO will need to go to UGATTCharacteristic probably
+    BLUETOOTH_GATT_EVENT_HANDLE EventHandle;
+
+    characteristic.setCallback(callback);
+
+    HRESULT hr = BluetoothGATTRegisterEvent(
+      service_handle,
+      EventType,
+      &EventParameterIn,
+      &UGATTCharacteristic::GattEventNotificationCallback,
+      &characteristic,
+      &EventHandle,
+      BLUETOOTH_GATT_FLAG_NONE);
+
+  }
+  else {
+    //Characteristic can't be notified
+  }
 }

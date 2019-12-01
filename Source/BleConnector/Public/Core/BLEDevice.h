@@ -91,8 +91,7 @@ public:
   UFUNCTION()
     FGATTValue GetCharacteristicValue(class UGATTCharacteristic* characteristic);
 
-  UFUNCTION()
-    void SetCharacteristicValue(class UGATTCharacteristic* characteristic, bool reliable_write = false);
+  void SetCharacteristicValue(class UGATTCharacteristic* characteristic, void* data, USHORT charValueDataSize, bool reliable_write = false);
 
   virtual void BeginDestroy() override;
 
@@ -130,16 +129,19 @@ private:
   //Handle to use the device
   HANDLE deviceHandle;
 
-  //Services of the device
-  //PBTH_LE_GATT_SERVICE pServiceBuffer;
+  PBTH_LE_GATT_CHARACTERISTIC_VALUE GetCharacteristicValueIntern(PBTH_LE_GATT_CHARACTERISTIC characteristic, HANDLE service_handle, HRESULT *result);
 
-  //Characteristics of the device
-  //PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
+  ////static function passed to BluetoothGATTRegisterEvent function
+  //static void GattEventNotificationCallback(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context);
+  ////current characteristic
+  //static uint8_t current_characteristic;
 	
 public:
   PBTH_LE_GATT_SERVICE GetGattServices(uint16_t* numServices);
 
   PBTH_LE_GATT_CHARACTERISTIC GetGATTCharacteristics(const class UGATTService* service, uint16_t* numCharacteristics);
+
+  void ActivateNotify(class UGATTCharacteristic& characteristic, void(*callback)());
 
 protected:
   void Reset();
@@ -155,6 +157,10 @@ protected:
   PBTH_LE_GATT_SERVICE getCharacteristicServiceData(const class UGATTCharacteristic& characteristic);
 
   HANDLE GetBLEHandle(GUID AGuid);
+
+  GUID ShortUuidToGuid(const USHORT uuid16byte) const;
+
+  GUID GetGuidFromService(const PBTH_LE_GATT_SERVICE service) const;
 
 public:
   UPROPERTY()

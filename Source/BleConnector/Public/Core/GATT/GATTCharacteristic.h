@@ -2,9 +2,13 @@
 
 #pragma once
 
+#include "bleapi_includes.h"
+
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "GATTCharacteristic.generated.h"
+
+//typedef void(*event_callback)();
 
 /**
  * 
@@ -43,6 +47,10 @@ public:
   void init(const uint16_t id, const uint16_t service_id,
     const bool notify, const bool read, const bool writeresponse, const bool writenoresponse,
     FString guid);
+
+  void setCallback(void(*callback)());
+
+  static void GattEventNotificationCallback(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context);
 	
 private:
 
@@ -59,5 +67,8 @@ private:
   uint16_t id_;
 
   uint16_t service_id_;
-	
+
+  ////Callback assigned to the characteristic
+  void(*event_callback)() = nullptr;
+  //event_callback callback = nullptr;
 };
