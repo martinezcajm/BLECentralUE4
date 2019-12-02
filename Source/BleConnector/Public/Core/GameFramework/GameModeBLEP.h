@@ -24,4 +24,11 @@ public:
   UPROPERTY()
     class UBLECentral* CurrentLowEnergyCentral;
 
+  UPROPERTY()
+    class UDemoMainBLEUI* CurrentMenu;
+
+protected:
+  //BP instance that we want to use as our Menu
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "HUD", Meta = (BlueprintProtected = "true"))
+    TSubclassOf<class UDemoMainBLEUI> HUDMenuClass;
 };

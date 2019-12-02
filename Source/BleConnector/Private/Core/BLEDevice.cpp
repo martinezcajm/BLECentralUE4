@@ -797,8 +797,19 @@ void UBLEDevice::ActivateNotify(class UGATTCharacteristic& characteristic, void(
       &EventHandle,
       BLUETOOTH_GATT_FLAG_NONE);
 
+    if (S_OK != hr) {
+      //Error
+      return;
+    }
+    characteristic.setEventHandle(EventHandle);
+
   }
   else {
     //Characteristic can't be notified
   }
+}
+
+void UBLEDevice::DeactivateNotify(UGATTCharacteristic& characteristic) {
+  characteristic.unregisterNotification();
+  characteristic.setCallback(nullptr);
 }

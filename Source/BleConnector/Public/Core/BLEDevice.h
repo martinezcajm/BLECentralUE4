@@ -143,6 +143,8 @@ public:
 
   void ActivateNotify(class UGATTCharacteristic& characteristic, void(*callback)());
 
+  void DeactivateNotify(class UGATTCharacteristic& characteristic);
+
 protected:
   void Reset();
 

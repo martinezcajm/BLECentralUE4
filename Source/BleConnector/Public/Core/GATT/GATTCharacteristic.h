@@ -50,8 +50,13 @@ public:
 
   void setCallback(void(*callback)());
 
+  void setEventHandle(BLUETOOTH_GATT_EVENT_HANDLE event_handle);
+
   static void GattEventNotificationCallback(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context);
 	
+  UFUNCTION()
+    void unregisterNotification();
+
 private:
 
   bool notify_;
@@ -70,5 +75,6 @@ private:
 
   ////Callback assigned to the characteristic
   void(*event_callback)() = nullptr;
-  //event_callback callback = nullptr;
+
+  BLUETOOTH_GATT_EVENT_HANDLE event_notify_handle = nullptr;
 };

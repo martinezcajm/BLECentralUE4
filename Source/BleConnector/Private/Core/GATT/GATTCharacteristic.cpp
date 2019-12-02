@@ -56,7 +56,7 @@ void UGATTCharacteristic::init(const uint16_t id, const uint16_t service_id,
   charGUID_ = guid;
 }
 
-//Fix for the error as Microsoft indicates
+//Fix for the crash after more than 1 callback error as Microsoft indicates
 //https://social.msdn.microsoft.com/Forums/windowsdesktop/en-US/e30e43cf-4cda-40ab-9075-0e1babeaf23f/program-crashed-after-recived-bluetooth-le-notification?forum=wdk&prof=required
 void CALLBACK UGATTCharacteristic::GattEventNotificationCallback(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context) {
   //We need to get the object from the context
@@ -69,4 +69,14 @@ void CALLBACK UGATTCharacteristic::GattEventNotificationCallback(BTH_LE_GATT_EVE
 
 void UGATTCharacteristic::setCallback(void(*callback)()) {
   event_callback = callback;
+}
+
+void UGATTCharacteristic::setEventHandle(BLUETOOTH_GATT_EVENT_HANDLE event_handle) {
+  event_notify_handle = event_handle;
+}
+
+void UGATTCharacteristic::unregisterNotification() {
+  if (event_notify_handle != nullptr) {
+    HRESULT hr = BluetoothGATTUnregisterEvent(event_notify_handle, BLUETOOTH_GATT_FLAG_NONE);
+  }
 }
