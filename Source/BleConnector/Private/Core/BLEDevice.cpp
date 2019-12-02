@@ -792,7 +792,7 @@ void UBLEDevice::ActivateNotify(class UGATTCharacteristic& characteristic, void(
       service_handle,
       EventType,
       &EventParameterIn,
-      &UGATTCharacteristic::GattEventNotificationCallback,
+      (PFNBLUETOOTH_GATT_EVENT_CALLBACK)&UGATTCharacteristic::GattEventNotificationCallback,
       &characteristic,
       &EventHandle,
       BLUETOOTH_GATT_FLAG_NONE);
