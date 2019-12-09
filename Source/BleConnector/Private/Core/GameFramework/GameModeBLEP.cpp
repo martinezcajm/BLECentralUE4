@@ -26,6 +26,7 @@ void AGameModeBLEP::BeginPlay() {
   }
 
   CurrentLowEnergyCentral = NewObject<UBLECentral>();
+  CurrentMenu->setBLECentral(CurrentLowEnergyCentral);
   TArray<UBLEDevice*> devices =  CurrentLowEnergyCentral->SearchBLEDevices();
   //devices[0]->Connect();
   //devices[0]->GetCharacteristicValue(devices[0]->deviceCharacteristics[0]);

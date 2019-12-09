@@ -20,7 +20,11 @@ public:
   UFUNCTION(BlueprintCallable)
     void UpdateDevices();
 
+  void setBLECentral(class UBLECentral * logic);
+
 protected:
+  UFUNCTION(BlueprintCallable)
+    void ScanDevices();
   
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BLEHUD")
     class UCanvasPanel *MenuPanel;
@@ -41,6 +45,6 @@ protected:
     int MaxColumns = 3;
 
   UPROPERTY()
-    class UBLECentral *centralLogic;
+    class UBLECentral *centralLogic = nullptr;
 
 };

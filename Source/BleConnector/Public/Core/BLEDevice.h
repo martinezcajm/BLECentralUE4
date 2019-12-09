@@ -27,35 +27,15 @@ enum class EDeviceInterfaceDetail : uint8 {
   IE_Size  UMETA(DisplayName = "ClassGuid")
 };
 
-UENUM(BlueprintType)
-enum class ETypeValue : uint8 {
-  VE_UINT8 UMETA(DisplayName = "Uint8"),
-  VE_UINT16  UMETA(DisplayName = "Uint16"),
-  VE_STRING UMETA(DisplayName = "String"),
-  VE_ERROR UMETA(DisplayName = "Error")
-};
-
 USTRUCT()
 struct FGATTValue {
   GENERATED_USTRUCT_BODY()
 
   UPROPERTY()
-  ETypeValue type;
-
-  //TODO this would be better with an union. Unfortunately right now UE4 doesn't support
-  //unions as propperties so can't be used at bluepritns
-  //UPROPERTY()
-  //  typedef union value {
-  //  uint16 ui16;
-  //  uint8 ui8;
-  //  FString s;
-  //} v;
-
-  UPROPERTY()
     FString s;
 
   UPROPERTY()
-    uint8 ui8;
+    int int_value;
 
 };
 
@@ -96,6 +76,8 @@ public:
   virtual void BeginDestroy() override;
 
   void Init(HDEVINFO info, SP_DEVINFO_DATA infoData, SP_DEVICE_INTERFACE_DATA interfaceData);
+
+  FString getFriendlyName() const;
 	
 private:
 

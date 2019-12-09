@@ -82,6 +82,10 @@ void UBLEDevice::FriendlyName(FString fn) {
   friendlyName_ = fn;
 }
 
+FString UBLEDevice::getFriendlyName() const {
+  return friendlyName_;
+}
+
 void UBLEDevice::CreateHandle() {
   if (path_ != "") {
     if (deviceHandle != nullptr) CloseHandle(deviceHandle);
@@ -607,7 +611,6 @@ FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristi
   FGATTValue result;
   memset(&result, 0, sizeof(FGATTValue));
   if (!characteristic->canBeRead()) {
-    result.type = ETypeValue::VE_ERROR;
     result.s = FString::Printf(TEXT("Error: this characteristic is specified as no readable"));
     return result;
   }
@@ -629,25 +632,28 @@ FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristi
     service_handle, &hr);
 
   if (S_OK != hr) {
-    result.type = ETypeValue::VE_ERROR;
     result.s = FString::Printf(TEXT("Error: Problem reading the characteristic BluetoothGATTGetCharacteristicValue"));
     if (pCharValueBuffer != nullptr) free(pCharValueBuffer);
     pCharValueBuffer = nullptr;
     return result;
   }
 
-  result.type = ETypeValue::VE_STRING;
-  FString aux;
-  FString aux2;
-  for (ULONG iii = 0; iii< pCharValueBuffer->DataSize; iii++) {
-    aux += FString::Printf(TEXT("%d"), pCharValueBuffer->Data[iii]);
-    aux2 += FString::Printf(TEXT("%c"), pCharValueBuffer->Data[iii]);
-  }
-  result.s = aux2;
-  result.ui8 = FCString::Atoi(*aux);
-  //memcpy(&(result.s), &aux, aux.Len());
-  if(pCharValueBuffer != nullptr) free(pCharValueBuffer);
-  pCharValueBuffer = nullptr;
+  characteristic->updateValue(pCharValueBuffer);
+
+  result.s = characteristic->GetValueAsString();
+  result.int_value = characteristic->GetValueAsInt();
+
+  //FString aux;
+  //FString aux2;
+  //for (ULONG iii = 0; iii< pCharValueBuffer->DataSize; iii++) {
+  //  aux += FString::Printf(TEXT("%d"), pCharValueBuffer->Data[iii]);
+  //  aux2 += FString::Printf(TEXT("%c"), pCharValueBuffer->Data[iii]);
+  //}
+  //result.s = aux2;
+  //result.ui8 = FCString::Atoi(*aux);
+  ////memcpy(&(result.s), &aux, aux.Len());
+  //if(pCharValueBuffer != nullptr) free(pCharValueBuffer);
+  //pCharValueBuffer = nullptr;
 
 
   return result;

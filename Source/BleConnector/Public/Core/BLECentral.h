@@ -19,7 +19,9 @@ class BLECONNECTOR_API UBLECentral : public UObject
 	GENERATED_BODY()
 
 public:
-  UFUNCTION()
+  UFUNCTION(BlueprintCallable)
     TArray<UBLEDevice*> SearchBLEDevices();
 	
+  UPROPERTY(BlueprintReadOnly)
+    TArray<UBLEDevice*> devices;
 };

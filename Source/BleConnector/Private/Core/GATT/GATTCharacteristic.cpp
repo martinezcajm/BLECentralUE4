@@ -10,6 +10,19 @@ UGATTCharacteristic::UGATTCharacteristic() : UObject() {
   write_without_response_ = false;
   id_ = 0;
   charGUID_ = "";
+
+  characteristic_value.int_value = 0;
+  characteristic_value.raw_data = nullptr;
+  characteristic_value.size = 0;
+  characteristic_value.string_data = FString("");
+}
+
+void UGATTCharacteristic::BeginDestroy() {
+  if (characteristic_value.raw_data != nullptr) {
+    free(characteristic_value.raw_data);
+    characteristic_value.raw_data = nullptr;
+  }
+  Super::BeginDestroy();
 }
 
 int UGATTCharacteristic::getValue() {
@@ -61,6 +74,12 @@ void UGATTCharacteristic::init(const uint16_t id, const uint16_t service_id,
 void CALLBACK UGATTCharacteristic::GattEventNotificationCallback(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context) {
   //We need to get the object from the context
   UGATTCharacteristic* pThis = static_cast<UGATTCharacteristic*>(Context);
+  
+  //We update the value of the characteristic
+  PBLUETOOTH_GATT_VALUE_CHANGED_EVENT ValueChangedEventParameters = (PBLUETOOTH_GATT_VALUE_CHANGED_EVENT)EventOutParameter;
+  pThis->updateValue(ValueChangedEventParameters->CharacteristicValue);
+  
+  
   //Once we have it if a callback has been assigned to the characteristic we call it
   if (pThis->event_callback != nullptr) {
     pThis->event_callback();
@@ -79,4 +98,24 @@ void UGATTCharacteristic::unregisterNotification() {
   if (event_notify_handle != nullptr) {
     HRESULT hr = BluetoothGATTUnregisterEvent(event_notify_handle, BLUETOOTH_GATT_FLAG_NONE);
   }
+}
+
+void UGATTCharacteristic::updateValue(PBTH_LE_GATT_CHARACTERISTIC_VALUE gatt_value) {
+  characteristic_value.size = gatt_value->DataSize;
+  characteristic_value.raw_data = (unsigned char*)malloc(characteristic_value.size);
+  memcpy(characteristic_value.raw_data, gatt_value->Data, characteristic_value.size);
+
+  FString aux;
+  for (ULONG iii = 0; iii< characteristic_value.size; iii++) {
+    characteristic_value.string_data += FString::Printf(TEXT("%d"), characteristic_value.raw_data[iii]);
+  }
+  characteristic_value.int_value = FCString::Atoi(*characteristic_value.string_data);
+}
+
+FString UGATTCharacteristic::GetValueAsString() {
+  return characteristic_value.string_data;
+}
+
+int UGATTCharacteristic::GetValueAsInt() {
+  return characteristic_value.int_value;
 }

@@ -4,7 +4,8 @@
 
 TArray<UBLEDevice*> UBLECentral::SearchBLEDevices() {
 
-  TArray<UBLEDevice*> devices;
+  devices.Empty();
+  //TArray<UBLEDevice*> devices;
   
   HDEVINFO hDeviceInfo;
 

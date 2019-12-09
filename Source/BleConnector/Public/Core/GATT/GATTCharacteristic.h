@@ -9,7 +9,40 @@
 #include "GATTCharacteristic.generated.h"
 
 //typedef void(*event_callback)();
+//USTRUCT()
+//struct FGATTValue {
+//  GENERATED_USTRUCT_BODY()
+//
+//    UPROPERTY()
+//    ETypeValue type;
+//
+//  //TODO this would be better with an union. Unfortunately right now UE4 doesn't support
+//  //unions as propperties so can't be used at bluepritns
+//  //UPROPERTY()
+//  //  typedef union value {
+//  //  uint16 ui16;
+//  //  uint8 ui8;
+//  //  FString s;
+//  //} v;
+//
+//  UPROPERTY()
+//    FString s;
+//
+//  UPROPERTY()
+//    uint8 ui8;
+//
+//};
 
+struct GATTValue {
+  uint16 int_value;
+
+  unsigned char* raw_data;
+
+  UPROPERTY()
+    FString string_data;
+
+  uint32 size;
+};
 /**
  * 
  */
@@ -21,6 +54,8 @@ class BLECONNECTOR_API UGATTCharacteristic : public UObject
 public:
 
   UGATTCharacteristic();
+
+  virtual void BeginDestroy() override;
 
   UFUNCTION()
     int getValue();
@@ -57,6 +92,14 @@ public:
   UFUNCTION()
     void unregisterNotification();
 
+  void updateValue(PBTH_LE_GATT_CHARACTERISTIC_VALUE gatt_value);
+
+  UFUNCTION(BlueprintCallable)
+    FString GetValueAsString();
+
+  UFUNCTION(BlueprintCallable)
+    int GetValueAsInt();
+
 private:
 
   bool notify_;
@@ -77,4 +120,6 @@ private:
   void(*event_callback)() = nullptr;
 
   BLUETOOTH_GATT_EVENT_HANDLE event_notify_handle = nullptr;
+
+  GATTValue characteristic_value;
 };
