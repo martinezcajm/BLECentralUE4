@@ -28,6 +28,7 @@ void UDemoMainBLEUI::UpdateDevices() {
     //
     FString device_name = device->getFriendlyName();
     deviceItemInstance->SetNameDevice_BP(device_name);
+    deviceItemInstance->setDevice(device);
     //deviceItemInstance->deviceName->SetText(FText::FromString(device_name));
     if (device->IsConnected()) {
       deviceItemInstance->SetConnectionStatus_BP(FString("Connected"));
@@ -41,5 +42,4 @@ void UDemoMainBLEUI::UpdateDevices() {
     device_idx++;
   }
 }
-
 

@@ -22,6 +22,9 @@ public:
 
   void setBLECentral(class UBLECentral * logic);
 
+  //UFUNCTION(BlueprintCallable)
+  //  void UpdateCharacteristicsDevice(class UBLEDevice* device);
+
 protected:
   UFUNCTION(BlueprintCallable)
     void ScanDevices();

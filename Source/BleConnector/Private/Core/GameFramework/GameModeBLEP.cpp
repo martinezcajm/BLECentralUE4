@@ -27,6 +27,9 @@ void AGameModeBLEP::BeginPlay() {
 
   CurrentLowEnergyCentral = NewObject<UBLECentral>();
   CurrentMenu->setBLECentral(CurrentLowEnergyCentral);
+  
+  //Old test
+  
   TArray<UBLEDevice*> devices =  CurrentLowEnergyCentral->SearchBLEDevices();
   //devices[0]->Connect();
   //devices[0]->GetCharacteristicValue(devices[0]->deviceCharacteristics[0]);
@@ -36,7 +39,7 @@ void AGameModeBLEP::BeginPlay() {
   devices[1]->GetCharacteristicValue(devices[1]->deviceCharacteristics[2]);
   devices[1]->GetCharacteristicValue(devices[1]->deviceCharacteristics[3]);
   devices[1]->GetCharacteristicValue(devices[1]->deviceCharacteristics[4]);
-  //TEST sending data to Emego (write)
+  /*//TEST sending data to Emego (write)
   //Byte 0 (OP code) byte 1 (data) byte 2 (Data)
   //For this case OP code = 0 (Trigger level)
   // Byte 2 = 8
@@ -45,16 +48,6 @@ void AGameModeBLEP::BeginPlay() {
   byte data[] = {0x00, 0x08, 0x2A};
   devices[1]->SetCharacteristicValue(devices[1]->deviceCharacteristics[5], data, 3);
   devices[1]->ActivateNotify(*(devices[1]->deviceCharacteristics[4]), &DoSomething);
-  //devices[0]->CreateHandle();
-  //The order matters!
-  /*devices[1]->TestGetGattServices();
-  devices[1]->TestGetCharacteristics();
-  devices[1]->TestGetDescriptors();*/
-  //bool status = devices[0]->IsConnected();
-  //if (status) {
-  //  devices[0]->GetGattServices();
-  //  devices[0]->GetGATTCharacteristics();
-  //  devices[0]->TestGetDescriptors();
-  //}
-  
+
+  */
 }
