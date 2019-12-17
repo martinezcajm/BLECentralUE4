@@ -32,6 +32,9 @@ void UBLEDevice::Init(HDEVINFO info, SP_DEVINFO_DATA infoData, SP_DEVICE_INTERFA
 }
 
 void UBLEDevice::Connect() {
+  //The device is already connected
+  if (ready_) return;
+  
   CreateHandle();
 
   uint16_t num_services;
@@ -169,12 +172,21 @@ bool UBLEDevice::IsConnected() {
 }
 
 void UBLEDevice::Reset() {
+  ready_ = false;
   if (deviceHandle != nullptr) {
     CloseHandle(deviceHandle);
   }
   if (deviceInfo != nullptr) {
     SetupDiDestroyDeviceInfoList(deviceInfo);
   }
+  for (UGATTCharacteristic* characteristic : deviceCharacteristics) {
+    characteristic->Reset();
+  }
+  for (UGATTService* service : deviceServices) {
+    service->Reset();
+  }
+  deviceCharacteristics.Empty();
+  deviceServices.Empty();
 }
 
 void UBLEDevice::BeginDestroy() {
@@ -652,8 +664,9 @@ FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristi
   //result.s = aux2;
   //result.ui8 = FCString::Atoi(*aux);
   ////memcpy(&(result.s), &aux, aux.Len());
-  //if(pCharValueBuffer != nullptr) free(pCharValueBuffer);
-  //pCharValueBuffer = nullptr;
+  if(pCharValueBuffer != nullptr) free(pCharValueBuffer);
+  pCharValueBuffer = nullptr;
+  characteristic->GetValueAsString();
 
 
   return result;

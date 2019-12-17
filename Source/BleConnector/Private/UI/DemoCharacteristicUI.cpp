@@ -13,12 +13,15 @@ void UDemoCharacteristicUI::initUI(class UGATTCharacteristic* characteristic, cl
   else {
     HideWriteUI_BP();
   }
+  
   FString UUI = FString("GUID: ") + characteristic->characteristicGUID();
   FString int_value;
   int_value.AppendInt(characteristic->GetValueAsInt());
   FString value = FString("Value: Int (") + int_value +
     FString(") String ( " + characteristic->GetValueAsString() + FString(")"));
-
+  if (!characteristic->canBeRead()) {
+    value = FString("This characteristic is no readable. There's no value to read.");
+  }
   SetValue_BP(value);
   SetUUI_BP(UUI);
 }

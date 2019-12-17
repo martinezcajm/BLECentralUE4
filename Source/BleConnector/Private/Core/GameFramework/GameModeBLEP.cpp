@@ -39,7 +39,7 @@ void AGameModeBLEP::BeginPlay() {
   devices[1]->GetCharacteristicValue(devices[1]->deviceCharacteristics[2]);
   devices[1]->GetCharacteristicValue(devices[1]->deviceCharacteristics[3]);
   devices[1]->GetCharacteristicValue(devices[1]->deviceCharacteristics[4]);
-  /*//TEST sending data to Emego (write)
+  //TEST sending data to Emego (write)
   //Byte 0 (OP code) byte 1 (data) byte 2 (Data)
   //For this case OP code = 0 (Trigger level)
   // Byte 2 = 8
@@ -49,5 +49,5 @@ void AGameModeBLEP::BeginPlay() {
   devices[1]->SetCharacteristicValue(devices[1]->deviceCharacteristics[5], data, 3);
   devices[1]->ActivateNotify(*(devices[1]->deviceCharacteristics[4]), &DoSomething);
 
-  */
+  
 }

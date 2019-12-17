@@ -100,6 +100,8 @@ public:
   UFUNCTION(BlueprintCallable)
     int GetValueAsInt();
 
+  void Reset();
+
 private:
 
   bool notify_;

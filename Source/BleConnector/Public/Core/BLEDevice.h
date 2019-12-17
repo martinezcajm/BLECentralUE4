@@ -127,9 +127,10 @@ public:
 
   void DeactivateNotify(class UGATTCharacteristic& characteristic);
 
-protected:
   void Reset();
 
+protected:
+  
   void PrepareCharacteristicForNotify(const class UGATTCharacteristic& characteristic);
 
   PBTH_LE_GATT_DESCRIPTOR getDescriptors(const class UGATTCharacteristic& characteristic, uint16_t *numDescriptors);

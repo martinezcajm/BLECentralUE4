@@ -18,11 +18,16 @@ UGATTCharacteristic::UGATTCharacteristic() : UObject() {
 }
 
 void UGATTCharacteristic::BeginDestroy() {
+  Reset();
+  Super::BeginDestroy();
+}
+
+void UGATTCharacteristic::Reset() {
   if (characteristic_value.raw_data != nullptr) {
     free(characteristic_value.raw_data);
     characteristic_value.raw_data = nullptr;
   }
-  Super::BeginDestroy();
+  unregisterNotification();
 }
 
 int UGATTCharacteristic::getValue() {
@@ -101,15 +106,29 @@ void UGATTCharacteristic::unregisterNotification() {
 }
 
 void UGATTCharacteristic::updateValue(PBTH_LE_GATT_CHARACTERISTIC_VALUE gatt_value) {
-  characteristic_value.size = gatt_value->DataSize;
-  characteristic_value.raw_data = (unsigned char*)malloc(characteristic_value.size);
-  memcpy(characteristic_value.raw_data, gatt_value->Data, characteristic_value.size);
 
-  FString aux;
-  for (ULONG iii = 0; iii< characteristic_value.size; iii++) {
-    characteristic_value.string_data += FString::Printf(TEXT("%d"), characteristic_value.raw_data[iii]);
+  //We don't have the value or the size is new (this last case shouldn't happen)
+  if (characteristic_value.size == 0 || characteristic_value.size != gatt_value->DataSize) { //We don't have the value or the size is new (this last case shouldn't happen)
+    characteristic_value.size = gatt_value->DataSize;
+    if (characteristic_value.raw_data != nullptr) {
+      free(characteristic_value.raw_data);
+    }
+    characteristic_value.raw_data = (unsigned char*)malloc(characteristic_value.size);
   }
-  characteristic_value.int_value = FCString::Atoi(*characteristic_value.string_data);
+  //Now we only do this if it's the first time the characteristic is read or the size has
+  //changed 
+  /*characteristic_value.size = gatt_value->DataSize;
+  characteristic_value.raw_data = (unsigned char*)malloc(characteristic_value.size);*/
+  //We initialize with the end of string character
+  memset(characteristic_value.raw_data, '\0', characteristic_value.size);
+  memcpy(characteristic_value.raw_data, gatt_value->Data, characteristic_value.size);
+  
+  characteristic_value.string_data.Empty();
+  //characteristic_value.string_data = FString("");
+  for (ULONG iii = 0; iii< characteristic_value.size; iii++) {
+    characteristic_value.string_data += FString::Printf(TEXT("%c"), characteristic_value.raw_data[iii]);
+  }
+  characteristic_value.int_value = (uint16)*(characteristic_value.raw_data);
 }
 
 FString UGATTCharacteristic::GetValueAsString() {

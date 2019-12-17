@@ -32,13 +32,12 @@ public:
   void Init(const uint16_t id);
 
   void InitCharacteristics(PBTH_LE_GATT_CHARACTERISTIC characteristics_data);
+
+  void Reset();
 	
 private:
   //Characteristics of the device
   PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
-
-  void Reset();
-
 
   uint16_t id_;
 };

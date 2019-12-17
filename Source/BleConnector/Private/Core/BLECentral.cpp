@@ -4,6 +4,10 @@
 
 TArray<UBLEDevice*> UBLECentral::SearchBLEDevices() {
 
+  //for (UBLEDevice* device : devices) {
+  //  device->Reset();
+  //  //delete device;
+  //}
   devices.Empty();
   //TArray<UBLEDevice*> devices;
   
