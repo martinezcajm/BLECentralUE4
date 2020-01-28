@@ -38,13 +38,14 @@ void UBLEDevice::Connect() {
   CreateHandle();
 
   uint16_t num_services;
-  PBTH_LE_GATT_SERVICE services = GetGattServices(&num_services);
-  UGATTService::InitServicesData(services, num_services);
+  //PBTH_LE_GATT_SERVICE services = GetGattServices(&num_services);
+  //UGATTService::InitServicesData(services, num_services);
+  pServiceBuffer = GetGattServices(&num_services);
 
   for (int i = 0; i < num_services; i++) {
     UGATTService* newService = NewObject<UGATTService>();
     newService->Init(i);
-
+    newService->InitServicesData(pServiceBuffer, num_services);
     uint16_t num_characteristics;
     PBTH_LE_GATT_CHARACTERISTIC service_characteristics = GetGATTCharacteristics(newService, &num_characteristics);
     for (int j = 0; j < num_characteristics; j++) {
@@ -184,6 +185,10 @@ void UBLEDevice::Reset() {
   }
   for (UGATTService* service : deviceServices) {
     service->Reset();
+  }
+  if (pServiceBuffer != nullptr) {
+    free(pServiceBuffer);
+    pServiceBuffer = nullptr;
   }
   deviceCharacteristics.Empty();
   deviceServices.Empty();
@@ -569,8 +574,10 @@ void UBLEDevice::PrepareCharacteristicForNotify(const UGATTCharacteristic& chara
         &newValue,
         BLUETOOTH_GATT_FLAG_NONE);
       }
-    
-    }
+    free(pDescValueBuffer);
+  }
+
+  free(pDescriptorBuffer);
 
 }
 
@@ -578,7 +585,7 @@ void UBLEDevice::PrepareCharacteristicForNotify(const UGATTCharacteristic& chara
 //notice that this function won't free the memory allocated so its responsability of the one who called
 //this function to do it. This function only should be used by the BLEDevice class. Please use the
 //GetChatacteristicValue to get the value
-PBTH_LE_GATT_CHARACTERISTIC_VALUE UBLEDevice::GetCharacteristicValueIntern(PBTH_LE_GATT_CHARACTERISTIC characteristic, HANDLE service_handle, HRESULT *result) {
+PBTH_LE_GATT_CHARACTERISTIC_VALUE UBLEDevice::GetCharacteristicValueIntern(PBTH_LE_GATT_CHARACTERISTIC characteristic, HANDLE service_handle, HRESULT *result, EReadMode readMode) {
   
   USHORT charValueDataSize = 0;
   
@@ -619,7 +626,7 @@ PBTH_LE_GATT_CHARACTERISTIC_VALUE UBLEDevice::GetCharacteristicValueIntern(PBTH_
 }
 
 //https://docs.microsoft.com/en-us/windows/win32/api/bluetoothleapis/nf-bluetoothleapis-bluetoothgattgetcharacteristicvalue
-FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristic) {
+FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristic, EReadMode readMode) {
   FGATTValue result;
   memset(&result, 0, sizeof(FGATTValue));
   if (!characteristic->canBeRead()) {
@@ -641,7 +648,7 @@ FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristi
   HRESULT hr;
 
   PBTH_LE_GATT_CHARACTERISTIC_VALUE pCharValueBuffer = GetCharacteristicValueIntern(current_characteristic,
-    service_handle, &hr);
+    service_handle, &hr, readMode);
 
   if (S_OK != hr) {
     result.s = FString::Printf(TEXT("Error: Problem reading the characteristic BluetoothGATTGetCharacteristicValue"));
@@ -655,15 +662,6 @@ FGATTValue UBLEDevice::GetCharacteristicValue(UGATTCharacteristic *characteristi
   result.s = characteristic->GetValueAsString();
   result.int_value = characteristic->GetValueAsInt();
 
-  //FString aux;
-  //FString aux2;
-  //for (ULONG iii = 0; iii< pCharValueBuffer->DataSize; iii++) {
-  //  aux += FString::Printf(TEXT("%d"), pCharValueBuffer->Data[iii]);
-  //  aux2 += FString::Printf(TEXT("%c"), pCharValueBuffer->Data[iii]);
-  //}
-  //result.s = aux2;
-  //result.ui8 = FCString::Atoi(*aux);
-  ////memcpy(&(result.s), &aux, aux.Len());
   if(pCharValueBuffer != nullptr) free(pCharValueBuffer);
   pCharValueBuffer = nullptr;
   characteristic->GetValueAsString();
@@ -729,6 +727,7 @@ void UBLEDevice::SetCharacteristicValue(UGATTCharacteristic* characteristic, voi
 
   if (S_OK != hr) {
     //Error
+    free(newValue);
     return;
   }
 
@@ -738,7 +737,7 @@ void UBLEDevice::SetCharacteristicValue(UGATTCharacteristic* characteristic, voi
       BLUETOOTH_GATT_FLAG_NONE);
   }
 
-  //if (newValue != nullptr) free(newValue);
+  if (newValue != nullptr) free(newValue);
 
 }
 
@@ -830,5 +829,4 @@ void UBLEDevice::ActivateNotify(class UGATTCharacteristic& characteristic, void(
 
 void UBLEDevice::DeactivateNotify(UGATTCharacteristic& characteristic) {
   characteristic.unregisterNotification();
-  characteristic.setCallback(nullptr);
 }

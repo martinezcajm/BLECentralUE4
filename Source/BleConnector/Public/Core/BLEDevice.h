@@ -27,6 +27,13 @@ enum class EDeviceInterfaceDetail : uint8 {
   IE_Size  UMETA(DisplayName = "ClassGuid")
 };
 
+UENUM(BlueprintType)
+enum class EReadMode : uint8 {
+  RE_None = BLUETOOTH_GATT_FLAG_NONE UMETA(DisplayName = "None"),
+  RE_FromDevice = BLUETOOTH_GATT_FLAG_FORCE_READ_FROM_DEVICE UMETA(DisplayName = "Device"),
+  RE_FromCache = BLUETOOTH_GATT_FLAG_FORCE_READ_FROM_CACHE UMETA(DisplayName = "Cache")
+};
+
 USTRUCT()
 struct FGATTValue {
   GENERATED_USTRUCT_BODY()
@@ -69,7 +76,7 @@ public:
     bool IsConnected();
 
   UFUNCTION()
-    FGATTValue GetCharacteristicValue(class UGATTCharacteristic* characteristic);
+    FGATTValue GetCharacteristicValue(class UGATTCharacteristic* characteristic, EReadMode readMode);
 
   void SetCharacteristicValue(class UGATTCharacteristic* characteristic, void* data, USHORT charValueDataSize, bool reliable_write = false);
 
@@ -111,7 +118,11 @@ private:
   //Handle to use the device
   HANDLE deviceHandle;
 
-  PBTH_LE_GATT_CHARACTERISTIC_VALUE GetCharacteristicValueIntern(PBTH_LE_GATT_CHARACTERISTIC characteristic, HANDLE service_handle, HRESULT *result);
+  PBTH_LE_GATT_CHARACTERISTIC_VALUE GetCharacteristicValueIntern(PBTH_LE_GATT_CHARACTERISTIC characteristic, HANDLE service_handle, HRESULT *result, EReadMode readMode);
+
+  PBTH_LE_GATT_SERVICE pServiceBuffer = nullptr;
+
+  //uint16_t numServices = 0;
 
   ////static function passed to BluetoothGATTRegisterEvent function
   //static void GattEventNotificationCallback(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context);

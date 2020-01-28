@@ -14,7 +14,7 @@ void UDemoCharacteristicsShow::UpdateCharacteristicsDevice(UBLEDevice* device) {
   for (UGATTCharacteristic* characteristic : device->deviceCharacteristics) {
     UDemoCharacteristicUI* characteristicItemInstance = CreateWidget<UDemoCharacteristicUI>(GetWorld(), GATTCharacteristic);
     //We get the value of the characteristic
-    device->GetCharacteristicValue(characteristic);
+    device->GetCharacteristicValue(characteristic, EReadMode::RE_FromDevice);
     characteristicItemInstance->initUI(characteristic, device);
     UUniformGridSlot* DeviceSlot = CharacteristicsRepresentation->AddChildToUniformGrid(characteristicItemInstance);
     DeviceSlot->SetRow(characteristic_idx / MaxColumns);

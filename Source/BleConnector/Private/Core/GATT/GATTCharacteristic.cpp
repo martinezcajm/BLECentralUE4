@@ -8,6 +8,7 @@ UGATTCharacteristic::UGATTCharacteristic() : UObject() {
   read_ = false;
   write_with_response_ = false;
   write_without_response_ = false;
+  notifying_ = false;
   id_ = 0;
   charGUID_ = "";
 
@@ -48,6 +49,10 @@ bool UGATTCharacteristic::canBeRead() const {
 
 bool UGATTCharacteristic::CanBeWritten() const {
   return write_with_response_ || write_without_response_;
+}
+
+bool UGATTCharacteristic::IsNotifying() const {
+  return notifying_;
 }
 
 FString UGATTCharacteristic::characteristicGUID() const {
@@ -97,11 +102,14 @@ void UGATTCharacteristic::setCallback(void(*callback)()) {
 
 void UGATTCharacteristic::setEventHandle(BLUETOOTH_GATT_EVENT_HANDLE event_handle) {
   event_notify_handle = event_handle;
+  notifying_ = true;
 }
 
 void UGATTCharacteristic::unregisterNotification() {
   if (event_notify_handle != nullptr) {
     HRESULT hr = BluetoothGATTUnregisterEvent(event_notify_handle, BLUETOOTH_GATT_FLAG_NONE);
+    notifying_ = false;
+    setCallback(nullptr);
   }
 }
 
@@ -128,7 +136,13 @@ void UGATTCharacteristic::updateValue(PBTH_LE_GATT_CHARACTERISTIC_VALUE gatt_val
   for (ULONG iii = 0; iii< characteristic_value.size; iii++) {
     characteristic_value.string_data += FString::Printf(TEXT("%c"), characteristic_value.raw_data[iii]);
   }
-  characteristic_value.int_value = (uint16)*(characteristic_value.raw_data);
+  characteristic_value.int_value = (uint16)*(characteristic_value.raw_data); 
+  /*UE_LOG(LogTemp, Log, TEXT("The raw value %s has been updated"), *characteristic_value.string_data);
+  UE_LOG(LogTemp, Log, TEXT("in numbers: %i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i-%i"),
+    (uint16)(gatt_value->Data[0]), (uint16)(gatt_value->Data[1]), (uint16)(gatt_value->Data[2]), (uint16)(gatt_value->Data[3]), (uint16)(gatt_value->Data[4]),
+    (uint16)(gatt_value->Data[5]), (uint16)(gatt_value->Data[6]), (uint16)(gatt_value->Data[7]), (uint16)(gatt_value->Data[8]), (uint16)(gatt_value->Data[9]), 
+    (uint16)(gatt_value->Data[10]), (uint16)(gatt_value->Data[11]), (uint16)(gatt_value->Data[12]), (uint16)(gatt_value->Data[13]), (uint16)(gatt_value->Data[14]), 
+    (uint16)(gatt_value->Data[15]), (uint16)(gatt_value->Data[16]), (uint16)(gatt_value->Data[17]), (uint16)(gatt_value->Data[18]), (uint16)(gatt_value->Data[19]));*/
 }
 
 FString UGATTCharacteristic::GetValueAsString() {
@@ -137,4 +151,8 @@ FString UGATTCharacteristic::GetValueAsString() {
 
 int UGATTCharacteristic::GetValueAsInt() {
   return characteristic_value.int_value;
+}
+
+unsigned char* UGATTCharacteristic::GetValueRawData() {
+  return characteristic_value.raw_data;
 }

@@ -6,10 +6,10 @@
 //Common data using the Structures of arrays (SOA) layout to have all the data regarding
 //the services togheter in memory. This way we also make use of the base data structure 
 //of windows PBTH_LE_GATT_SERVICE
-static struct {
-  PBTH_LE_GATT_SERVICE pServiceBuffer = nullptr;
-  uint8_t numServices = 0;
-}ServicesData;
+//static struct {
+//  PBTH_LE_GATT_SERVICE pServiceBuffer = nullptr;
+//  uint8_t numServices = 0;
+//}ServicesData;
 
 void UGATTService::InitServicesData(PBTH_LE_GATT_SERVICE services_data, uint16_t num_services) {
   ServicesData.pServiceBuffer = services_data;
@@ -35,10 +35,10 @@ void UGATTService::Reset() {
     free(pCharacteristicsBuffer);
     pCharacteristicsBuffer = nullptr;
   }
-  if (ServicesData.pServiceBuffer != nullptr) {
-    free(ServicesData.pServiceBuffer);
-    ServicesData.pServiceBuffer = nullptr;
-  }
+  //if (ServicesData.pServiceBuffer != nullptr) {
+  //  free(ServicesData.pServiceBuffer);
+  //  ServicesData.pServiceBuffer = nullptr;
+  //}
 }
 
 PBTH_LE_GATT_SERVICE UGATTService::getData() const {

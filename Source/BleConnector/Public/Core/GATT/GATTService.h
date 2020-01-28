@@ -8,6 +8,11 @@
 #include "UObject/NoExportTypes.h"
 #include "GATTService.generated.h"
 
+struct ServicesInfo {
+    PBTH_LE_GATT_SERVICE pServiceBuffer = nullptr;
+    uint8_t numServices = 0;
+};
+
 /**
  * 
  */
@@ -25,9 +30,11 @@ public:
 
   PBTH_LE_GATT_CHARACTERISTIC getCharacteristicsData() const;
 
-  static void InitServicesData(PBTH_LE_GATT_SERVICE services_data, uint16_t num_services);
+  //static void InitServicesData(PBTH_LE_GATT_SERVICE services_data, uint16_t num_services);
+  void InitServicesData(PBTH_LE_GATT_SERVICE services_data, uint16_t num_services);
 
-  static uint16_t totalServices();
+  //static uint16_t totalServices();
+  uint16_t totalServices();
 
   void Init(const uint16_t id);
 
@@ -40,4 +47,6 @@ private:
   PBTH_LE_GATT_CHARACTERISTIC pCharacteristicsBuffer;
 
   uint16_t id_;
+
+  ServicesInfo ServicesData;
 };

@@ -20,7 +20,7 @@ void UDemoCharacteristicUI::initUI(class UGATTCharacteristic* characteristic, cl
   FString value = FString("Value: Int (") + int_value +
     FString(") String ( " + characteristic->GetValueAsString() + FString(")"));
   if (!characteristic->canBeRead()) {
-    value = FString("This characteristic is no readable. There's no value to read.");
+    value = FString("No read characteristic.");
   }
   SetValue_BP(value);
   SetUUI_BP(UUI);

@@ -73,6 +73,9 @@ public:
    bool CanBeWritten() const;
 
   UFUNCTION()
+    bool IsNotifying() const;
+
+  UFUNCTION()
    FString characteristicGUID() const;
 
   uint16_t id() const;
@@ -100,6 +103,8 @@ public:
   UFUNCTION(BlueprintCallable)
     int GetValueAsInt();
 
+  unsigned char* GetValueRawData();
+
   void Reset();
 
 private:
@@ -111,6 +116,8 @@ private:
   bool write_with_response_;
 
   bool write_without_response_;
+
+  bool notifying_;
 
   FString charGUID_;
 
